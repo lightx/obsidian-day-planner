@@ -314,6 +314,26 @@ function mapTaskDiffToUpdate(props: {
     };
   }
 
+  if (task.isBoldTimeEntry) {
+    return [
+      {
+        type: "deleted",
+        path,
+        range: position,
+      },
+      {
+        type: "mdast",
+        path: periodicNotes.createDailyNotePath(task.startTime),
+        updateFn: (root: Root) =>
+          insertTextUnderHeading(
+            root,
+            settings.plannerHeading,
+            taskTextWithUpdatedProps,
+          ),
+      },
+    ];
+  }
+
   return [
     {
       type: "deleted",

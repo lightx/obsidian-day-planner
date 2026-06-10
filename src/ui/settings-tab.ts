@@ -32,6 +32,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
 
     containerEl.empty();
 
+    containerEl.createEl("p", {
+      text: `Version: ${this.plugin.manifest.version}`,
+      cls: "setting-item-description",
+    });
+
     // @ts-expect-error
     this.warningComponent = mount(Callout, {
       props: {
