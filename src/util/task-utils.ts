@@ -173,6 +173,20 @@ export function toString(task: WithTime<LocalTask>) {
     task.durationMinutes,
     get(settings).timestampFormat,
   );
+
+  if (task.isBoldTimeEntry) {
+    // Bold-time format: **HH:MM** some text
+    // task.text contains the text AFTER the bold time (set during indexing)
+    const timestamp = task.isAllDayEvent
+      ? ""
+      : updatedTimestamp;
+    const boldTimeText = task.isAllDayEvent
+      ? task.text
+      : `**${timestamp}** ${task.text}`;
+
+    return boldTimeText;
+  }
+
   const listTokens = createMarkdownListTokens(task);
 
   const withUpdatedOrDeletedTimeRange = task.isAllDayEvent

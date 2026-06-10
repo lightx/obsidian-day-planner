@@ -7,6 +7,7 @@ import {
   findFirst,
   fromMarkdown,
   insertListItemUnderHeading,
+  insertTextUnderHeading,
   isListItem,
   toMarkdown,
 } from "../mdast/mdast";
@@ -243,6 +244,21 @@ function mapTaskDiffToUpdate(props: {
         contents: taskTextWithUpdatedProps,
         path: task.location.path,
         target: task.location.position?.start?.line,
+      };
+    }
+
+    if (task.isBoldTimeEntry) {
+      // Bold-time entries are just paragraph text, not list items
+      return {
+        type: "mdast",
+        path: periodicNotes.createDailyNotePath(task.startTime),
+        updateFn: (root: Root) => {
+          return insertTextUnderHeading(
+            root,
+            settings.plannerHeading,
+            taskTextWithUpdatedProps,
+          );
+        },
       };
     }
 

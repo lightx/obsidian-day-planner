@@ -11,7 +11,8 @@ import { isNotVoid, isRecordOfType } from "typed-assert";
 
 import { clockFormat } from "../../constants";
 import { getTimeFromLine } from "../../parser/parser";
-import { listItemRegExp, scheduledPropRegExps } from "../../regexp";
+import { parseTime } from "../../parser/time";
+import { boldTimeRangeRegExp, listItemRegExp, scheduledPropRegExps } from "../../regexp";
 import type { ListPropsParser } from "../../service/list-props-parser";
 import type { PeriodicNotes } from "../../service/periodic-notes";
 import type { DayPlannerSettings } from "../../settings";
@@ -45,6 +46,7 @@ export interface ListItemEntry {
   children?: string[];
   logEntries?: string[];
   planEntries?: string[];
+  isBoldTimeEntry?: boolean;
 }
 
 type DenormalizedListItemEntry = Omit<
@@ -54,6 +56,7 @@ type DenormalizedListItemEntry = Omit<
   logEntries: LogEntry[];
   planEntries: PlanEntry[];
   children: DenormalizedListItemEntry[];
+  isBoldTimeEntry?: boolean;
 };
 
 export interface LogEntry {
@@ -350,6 +353,7 @@ export function planEntryToLocalTask(
     id: logEntry.id,
     isAllDayEvent: logEntry.isAllDay,
     children: listItemEntryWithChildren?.children,
+    isBoldTimeEntry: listItemEntry.isBoldTimeEntry,
   };
 }
 
@@ -570,114 +574,219 @@ export function createIndexListener(props: {
       settings.plannerHeading,
     );
 
-    if (!cache.listItems) {
-      return [];
+    // Collect lines that are already handled by list items (to skip them in bold-time pass)
+    const listItemLines = new Set<number>();
+    if (cache.listItems) {
+      for (const listItemCache of cache.listItems) {
+        listItemLines.add(listItemCache.position.start.line);
+      }
     }
 
-    const denormalizedListItemEntries = cache.listItems.reduce<
-      DenormalizedListItemEntry[]
-    >((result, listItemCache) => {
-      const fullListItemText = getTextAtPosition(
-        contents,
-        listItemCache.position,
-      );
+    const denormalizedListItemEntries: DenormalizedListItemEntry[] = [];
 
-      const listItemEntry: DenormalizedListItemEntry = createListItemEntry({
-        path,
-        contents,
-        listItemCache,
-      });
-
-      if (
-        dateFromPath &&
-        isInsideDailyNoteParseScope(
+    // Pass 1: existing list item entries (unchanged logic)
+    if (cache.listItems) {
+      for (const listItemCache of cache.listItems) {
+        const fullListItemText = getTextAtPosition(
+          contents,
           listItemCache.position,
-          plannerHeadingSectionPosition,
-        )
-      ) {
-        const time = getTimeFromLine({
-          line: listItemEntry.text,
-          day: dateFromPath,
-        });
-        const id = createId(listItemEntry.id, "daily");
-        const dayKeys = [getDayKey(dateFromPath)];
-
-        if (time) {
-          const { startTime, durationMinutes } = time;
-          const endTime = getEndTime({
-            startTime,
-            durationMinutes: durationMinutes ?? settings.defaultDurationMinutes,
-          });
-
-          listItemEntry.planEntries.push({
-            id,
-            dayKeys,
-            parent: listItemEntry.id,
-            start: startTime.format(clockFormat),
-            end: endTime.format(clockFormat),
-          });
-        } else if (isTaskCache(listItemCache)) {
-          listItemEntry.planEntries.push({
-            id,
-            dayKeys,
-            parent: listItemEntry.id,
-            start: dateFromPath.format(clockFormat),
-            // todo: this is not needed
-            end: dateFromPath
-              .clone()
-              .add(settings.defaultDurationMinutes, "minutes")
-              .format(clockFormat),
-            isAllDay: true,
-          });
-        }
-      }
-
-      if (isTaskCache(listItemCache)) {
-        // todo: new ObsidianTasksIndexer()
-        const obsidianTasksEntries = getObsidianTasksEntries({
-          firstLine: listItemEntry.text,
-          parentId: listItemEntry.id,
-        });
-
-        listItemEntry.planEntries.push(...obsidianTasksEntries);
-
-        // todo: new PropsIndexer
-        const listItemProps = listPropsParser.getListPropsFromListItem(
-          listItemCache,
-          fullListItemText,
         );
 
-        // todo: cut out props here, use removeWithin(text: string, outer: Pos, inner: Pos)
+        const listItemEntry: DenormalizedListItemEntry = createListItemEntry({
+          path,
+          contents,
+          listItemCache,
+        });
 
-        listItemEntry.propsPosition = listItemProps?.position;
-        listItemEntry.logEntries =
-          listItemProps?.parsed.planner?.log?.map(({ start, end }, index) =>
-            createLogEntry({
-              start,
-              end,
+        if (
+          dateFromPath &&
+          isInsideDailyNoteParseScope(
+            listItemCache.position,
+            plannerHeadingSectionPosition,
+          )
+        ) {
+          const time = getTimeFromLine({
+            line: listItemEntry.text,
+            day: dateFromPath,
+          });
+          const id = createId(listItemEntry.id, "daily");
+          const dayKeys = [getDayKey(dateFromPath)];
+
+          if (time) {
+            const { startTime, durationMinutes } = time;
+            const endTime = getEndTime({
+              startTime,
+              durationMinutes: durationMinutes ?? settings.defaultDurationMinutes,
+            });
+
+            listItemEntry.planEntries.push({
+              id,
+              dayKeys,
               parent: listItemEntry.id,
-              id: createId(listItemEntry.id, index),
-            }),
-          ) || [];
+              start: startTime.format(clockFormat),
+              end: endTime.format(clockFormat),
+            });
+          } else if (isTaskCache(listItemCache)) {
+            listItemEntry.planEntries.push({
+              id,
+              dayKeys,
+              parent: listItemEntry.id,
+              start: dateFromPath.format(clockFormat),
+              // todo: this is not needed
+              end: dateFromPath
+                .clone()
+                .add(settings.defaultDurationMinutes, "minutes")
+                .format(clockFormat),
+              isAllDay: true,
+            });
+          }
+        }
+
+        if (isTaskCache(listItemCache)) {
+          // todo: new ObsidianTasksIndexer()
+          const obsidianTasksEntries = getObsidianTasksEntries({
+            firstLine: listItemEntry.text,
+            parentId: listItemEntry.id,
+          });
+
+          listItemEntry.planEntries.push(...obsidianTasksEntries);
+
+          // todo: new PropsIndexer
+          const listItemProps = listPropsParser.getListPropsFromListItem(
+            listItemCache,
+            fullListItemText,
+          );
+
+          // todo: cut out props here, use removeWithin(text: string, outer: Pos, inner: Pos)
+
+          listItemEntry.propsPosition = listItemProps?.position;
+          listItemEntry.logEntries =
+            listItemProps?.parsed.planner?.log?.map(({ start, end }, index) =>
+              createLogEntry({
+                start,
+                end,
+                parent: listItemEntry.id,
+                id: createId(listItemEntry.id, index),
+              }),
+            ) || [];
+        }
+
+        if (
+          listItemEntry.planEntries.length > 0 ||
+          listItemEntry.logEntries.length > 0
+        ) {
+          denormalizedListItemEntries.push(listItemEntry);
+        }
+      }
+    }
+
+    // Pass 2: scan for bold-time paragraph entries (**HH:MM** text)
+    // Only scan within the daily note parse scope
+    if (dateFromPath) {
+      const lines = contents.split("\n");
+
+      // Determine line range to scan
+      let startLine = 0;
+      let endLine = lines.length;
+
+      if (plannerHeadingSectionPosition) {
+        startLine = plannerHeadingSectionPosition.start.line;
+        if (plannerHeadingSectionPosition.end) {
+          endLine = plannerHeadingSectionPosition.end.line;
+        }
+      } else if (settings.plannerHeading.length > 0) {
+        // Planner heading specified but not found — skip bold-time pass
+        startLine = endLine = 0;
       }
 
-      if (
-        listItemEntry.planEntries.length > 0 ||
-        listItemEntry.logEntries.length > 0
-      ) {
-        result.push(listItemEntry);
-      }
+      for (let lineIndex = startLine; lineIndex < endLine; lineIndex++) {
+        // Skip lines already handled as list items
+        if (listItemLines.has(lineIndex)) {
+          continue;
+        }
 
-      return result;
-    }, []);
+        const line = lines[lineIndex];
+        const boldTimeMatch = line.match(boldTimeRangeRegExp);
+
+        if (!boldTimeMatch?.groups) {
+          continue;
+        }
+
+        const { start, end, textAfterBoldTime } = boldTimeMatch.groups;
+
+        if (!start) {
+          continue;
+        }
+
+        const startTime = parseTime(start, dateFromPath);
+        let durationMinutes: number | undefined;
+
+        if (end) {
+          const endTime = parseTime(end, dateFromPath);
+          if (endTime.isAfter(startTime)) {
+            durationMinutes = getDiffInMinutes(endTime, startTime);
+          } else {
+            durationMinutes = getDiffInMinutes(
+              startTime,
+              endTime.clone().add(1, "day"),
+            );
+          }
+        }
+
+        const id = createId(path, lineIndex);
+        const dayKeys = [getDayKey(dateFromPath)];
+        const text = textAfterBoldTime?.trim() || "";
+
+        const boldTimeEntry: DenormalizedListItemEntry = {
+          id,
+          text,
+          symbol: "**",
+          task: undefined,
+          position: {
+            start: {
+              line: lineIndex,
+              col: 0,
+              offset: lines.slice(0, lineIndex).join("\n").length + (lineIndex > 0 ? 1 : 0),
+            },
+            end: {
+              line: lineIndex,
+              col: line.length,
+              offset: lines.slice(0, lineIndex).join("\n").length + (lineIndex > 0 ? 1 : 0) + line.length,
+            },
+          },
+          path,
+          children: [],
+          logEntries: [],
+          planEntries: [],
+          isBoldTimeEntry: true,
+        };
+
+        const planId = createId(id, "daily");
+        const endTimeCalc = getEndTime({
+          startTime,
+          durationMinutes: durationMinutes ?? settings.defaultDurationMinutes,
+        });
+
+        boldTimeEntry.planEntries.push({
+          id: planId,
+          dayKeys,
+          parent: id,
+          start: startTime.format(clockFormat),
+          end: endTimeCalc.format(clockFormat),
+        });
+
+        denormalizedListItemEntries.push(boldTimeEntry);
+      }
+    }
 
     if (denormalizedListItemEntries.length === 0) {
       return denormalizedListItemEntries;
     }
 
     // tree-building for nested list item operations
+    const listItems = cache.listItems || [];
 
-    const lineToChildrenLookup = createLineToChildrenLookup(cache.listItems);
+    const lineToChildrenLookup = createLineToChildrenLookup(listItems);
     const idToListItemEntry = denormalizedListItemEntries.reduce<
       Record<string, DenormalizedListItemEntry>
     >((result, current) => {
@@ -690,6 +799,14 @@ export function createIndexListener(props: {
     function createTree(
       listItemEntry: DenormalizedListItemEntry,
     ): ListItemEntryWithChildren {
+      // Bold-time entries never have child list items
+      if (listItemEntry.isBoldTimeEntry) {
+        return {
+          ...listItemEntry,
+          children: [],
+        };
+      }
+
       return {
         ...listItemEntry,
         children:
@@ -716,7 +833,8 @@ export function createIndexListener(props: {
   async function indexFile(path: string) {
     const cache = metadataCache.getCache(path);
 
-    if (!cache?.listItems) {
+    // Allow indexing even without listItems (file may have bold-time entries only)
+    if (!cache) {
       return undefined;
     }
 

@@ -57,6 +57,8 @@ export interface LocalTask extends ListItemTokens, BaseTask {
 
   // todo: move to Time
   durationMinutes: number;
+
+  isBoldTimeEntry?: boolean;
 }
 
 export type TaskWithoutComputedDuration = Omit<LocalTask, "durationMinutes"> &

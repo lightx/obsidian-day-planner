@@ -216,6 +216,52 @@ export function insertListItemUnderHeading(
   });
 }
 
+/**
+ * Insert plain text (paragraph) under a heading.
+ * Used for bold-time entries that are not list items.
+ */
+export function insertTextUnderHeading(
+  root: Root,
+  heading: string,
+  text: string,
+) {
+  return produce(root, (draft) => {
+    const headingIndex = draft.children.findIndex(
+      (child) =>
+        checkHeading(child) && getFirstTextNodeValue(child) === heading,
+    );
+
+    if (headingIndex >= 0) {
+      const afterHeading = draft.children.slice(headingIndex + 1);
+      const nextHeadingIndex = afterHeading.findIndex((child) =>
+        checkHeading(child),
+      );
+
+      const insertAt = nextHeadingIndex === -1
+        ? headingIndex + 1
+        : headingIndex + 1 + nextHeadingIndex;
+
+      // Parse the text as markdown and insert resulting nodes
+      const textRoot = fromMarkdown(text);
+      draft.children.splice(insertAt, 0, ...textRoot.children);
+    } else {
+      draft.children.push(
+        {
+          type: "heading",
+          depth: 1,
+          children: [
+            {
+              type: "text",
+              value: heading,
+            },
+          ],
+        },
+        ...fromMarkdown(text).children,
+      );
+    }
+  });
+}
+
 function compareAlphabetically(a: Node, b: Node) {
   const aText = getFirstTextNodeValue(a);
   const bText = getFirstTextNodeValue(b);

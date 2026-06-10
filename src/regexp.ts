@@ -43,6 +43,15 @@ export const keylessScheduledPropRegExp = new RegExp(
   `(\\(scheduled\\s*::\\s*)(?<date>${datePattern})(\\))`,
 );
 
+// Bold-time pattern: **HH:MM** or **HH:MM-HH:MM** at the start of a non-list line
+// Matches: **9:30** some text, **9:30-10:00** some text, **9:30 AM** some text
+const boldTimeWrapper = `\\*\\*`;
+const boldTimeRange = `${boldTimeWrapper}(?<start>${time})(?:${timeRangeSeparator}(?<end>${time}))?${boldTimeWrapper}`;
+export const boldTimeRangeRegExp = new RegExp(
+  `^\\s*${boldTimeRange}(?:\\s+(?<textAfterBoldTime>.+))?`,
+  "im",
+);
+
 export const hourglass = "⏳";
 
 export const shortScheduledPropRegExp = new RegExp(
