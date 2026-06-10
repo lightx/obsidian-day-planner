@@ -6,6 +6,8 @@
   import { timeRangeAtStartOfLineRegExp } from "../../regexp";
   import { type LocalTask } from "../../task-types";
   import { createMarkdownListTokens, getFirstLine } from "../../util/markdown";
+  import { createTimestamp } from "../../util/task-utils";
+  import { getMinutesSinceMidnight } from "../../util/moment";
   import type { HTMLActionArray } from "../actions/use-actions";
   import { createTimeBlockMenu } from "../time-block-menu";
 
@@ -39,7 +41,38 @@
   async function editTaskSummary() {
     isNotVoid(task.location);
 
-    // todo: replace with getOnelineSummary()
+    if (task.isBoldTimeEntry) {
+      // Bold-time format: **HH:MM** text
+      // task.text contains only the text after **HH:MM**
+      const next = await editText({
+        initialText: task.text,
+        getDescriptionText: (value) =>
+          value.trim().length === 0
+            ? "Start typing to update task text"
+            : `Update to "${value}"`,
+      });
+
+      if (next === undefined || next === task.text) {
+        return;
+      }
+
+      // Reconstruct the time prefix from task data
+      const timestamp = createTimestamp(
+        getMinutesSinceMidnight(task.startTime),
+        task.durationMinutes,
+        "HH:mm",
+      );
+      const lineContents = `**${timestamp}** ${next}`;
+
+      await editLine({
+        path: task.location.path,
+        position: task.location.position.start,
+        contents: lineContents,
+      });
+      return;
+    }
+
+    // List-item format: - HH:MM - text
     const firstLine = getFirstLine(task.text);
     const timestampMatch = firstLine.match(timeRangeAtStartOfLineRegExp);
     const timestampEnd = timestampMatch ? timestampMatch[0].length : 0;

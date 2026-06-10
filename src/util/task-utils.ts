@@ -369,7 +369,21 @@ export function getBlockProps(task: Task, settings: DayPlannerSettings) {
   return result.join(` ${bullet} `);
 }
 
-export function toRenderableMarkdown(timeBlock: Node) {
+export function toRenderableMarkdown(timeBlock: WithTime<LocalTask>) {
+  // Bold-time entries: render as **HH:MM** text, not as list items
+  if (timeBlock.isBoldTimeEntry) {
+    const fullLine = toString(timeBlock);
+    const firstLine = getFirstLine(fullLine);
+
+    const [, ...linesAfterFirst] = timeBlock.text.split("\n");
+
+    return {
+      listItem: firstLine,
+      paragraphs: linesAfterFirst.join("\n"),
+      nestedListItems: undefined,
+    };
+  }
+
   const formattedFirstLine = flow(
     getFirstLineAsMarkdown,
     (node) => (timeBlock.status ? node : removeListTokens(node)),

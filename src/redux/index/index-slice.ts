@@ -735,7 +735,9 @@ export function createIndexListener(props: {
 
         const id = createId(path, lineIndex);
         const dayKeys = [getDayKey(dateFromPath)];
-        const text = textAfterBoldTime?.trim() || "";
+        // Strip common separators after the bold time (dash, en-dash, em-dash)
+        // e.g. "**9:00** - task" → text = "task", not "- task"
+        const text = textAfterBoldTime?.trim().replace(/^[-–—]\s+/, "") || "";
 
         const boldTimeEntry: DenormalizedListItemEntry = {
           id,
