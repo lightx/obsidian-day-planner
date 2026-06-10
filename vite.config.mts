@@ -15,6 +15,7 @@ export default defineConfig((env) => ({
   resolve: process.env.VITEST
     ? {
         conditions: ["browser"],
+        dedupe: ["svelte", "svelte/internal"],
       }
     : undefined,
   plugins: [

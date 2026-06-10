@@ -1,4 +1,5 @@
-import { readFile } from "fs/promises";
+// Use eval-based require to bypass Vite's browser externalization of Node built-ins.
+const { readFile: readFileFs }: typeof import("node:fs/promises") = eval("require")("node:fs/promises");
 
 import { type MetadataCache, request, Vault } from "obsidian";
 import { beforeEach, describe, expect, onTestFinished, test, vi } from "vitest";
@@ -30,7 +31,7 @@ vi.mock("obsidian", () => ({
 const defaultVisibleDays = ["2024-09-26"];
 
 export async function getIcalFixture(file: string) {
-  return readFile(`fixtures/${file}.txt`, {
+  return readFileFs(`fixtures/${file}.txt`, {
     encoding: "utf8",
   });
 }

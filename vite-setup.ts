@@ -1,7 +1,11 @@
 import moment, { type Moment } from "moment";
 import { vi, expect } from "vitest";
-import path from "path";
 import yaml from "js-yaml";
+
+// Use eval-based require to bypass Vite's browser externalization of Node built-ins.
+// The conditions: ["browser"] in vite.config.mts causes Vite to replace "path"
+// with an empty stub when running in jsdom test environment.
+const path: typeof import("path") = eval("require")("path");
 
 window.moment = moment;
 

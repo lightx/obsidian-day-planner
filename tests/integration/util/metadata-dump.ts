@@ -1,19 +1,21 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import path from "node:path";
-
 import type { Moment } from "moment";
 import type { CachedMetadata } from "obsidian";
 import { check, isNotVoid } from "typed-assert";
 
 import { createInMemoryFile, type InMemoryFile } from "../../util/fakes";
 
-const { join } = path.posix;
-
 const dailyNoteFileNames = ["2025-07-19", "2025-07-20", "2025-07-28"];
 
 const fixturesDirPath = "fixtures";
-const dumpPath = join(fixturesDirPath, "metadata-dump", "tasks.json");
-const fixtureVaultPath = join(fixturesDirPath, "fixture-vault");
+const dumpPath = `${fixturesDirPath}/metadata-dump/tasks.json`;
+const fixtureVaultPath = `${fixturesDirPath}/fixture-vault`;
+
+// Use eval-based require to bypass Vite's browser externalization of Node built-ins.
+// The conditions: ["browser"] in vite.config.mts causes Vite to replace node:fs/promises
+// and node:path with empty stubs, breaking integration tests that read fixture files.
+const fsPromises: typeof import("node:fs/promises") = eval("require")("node:fs/promises");
+const posixPath: typeof import("node:path").posix = eval("require")("node:path").posix;
+const { join } = posixPath;
 
 export async function loadMetadataDump(props: {
   loadedFixtures?: string[];
@@ -24,7 +26,7 @@ export async function loadMetadataDump(props: {
 }> {
   const { loadedFixtures } = props;
 
-  const allFiles = await readdir(fixtureVaultPath);
+  const allFiles = await fsPromises.readdir(fixtureVaultPath);
 
   const inMemoryFiles = await Promise.all(
     allFiles
@@ -32,7 +34,7 @@ export async function loadMetadataDump(props: {
       .map(async (file) => {
         const filePath = join(fixtureVaultPath, file);
 
-        const stats = await stat(filePath);
+        const stats = await fsPromises.stat(filePath);
 
         if (!stats.isFile()) {
           throw new TypeError(
@@ -40,17 +42,15 @@ export async function loadMetadataDump(props: {
           );
         }
 
-        const contents = await readFile(filePath, "utf8");
-
+        const contents = await fsPromises.readFile(filePath, "utf8");
         return createInMemoryFile({ path: filePath, contents });
       }),
   );
 
-  const rawMetadataDump = await readFile(dumpPath, "utf-8");
+  const rawMetadataDump = await fsPromises.readFile(dumpPath, "utf-8");
 
   const metadataDump = JSON.parse(rawMetadataDump);
   const { cachedMetadata } = metadataDump;
-
   const pathToInMemoryFile = Object.fromEntries(
     inMemoryFiles.map((it) => [it.path, it]),
   );
