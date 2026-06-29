@@ -345,6 +345,7 @@ export function planEntryToLocalTask(
 
   return {
     status: listItemEntry.task,
+    task: listItemEntry.task,
     text: listItemEntry.text,
     location: { path: listItemEntry.path, position: listItemEntry.position },
     symbol: listItemEntry.symbol,
