@@ -9,6 +9,12 @@ const path: typeof import("path") = eval("require")("path");
 
 window.moment = moment;
 
+// Make requestIdleCallback synchronous in tests so the background batch scheduler
+// processes tasks immediately rather than racing against waitUntil's 1000ms timeout.
+window.requestIdleCallback = (callback) =>
+  window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => Infinity }), 0) as unknown as number;
+window.cancelIdleCallback = (id) => window.clearTimeout(id);
+
 vi.mock("obsidian", () => ({
   TFile: vi.fn(),
   normalizePath: (p: string) => path.normalize(p),
