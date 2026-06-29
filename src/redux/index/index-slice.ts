@@ -594,12 +594,6 @@ export function createIndexListener(props: {
       settings.plannerHeading,
     );
 
-    if (dateFromPath) {
-      console.debug(
-        `[day-planner] indexing ${path}: date=${dateFromPath.format("YYYY-MM-DD")} (periodic=${!!dateFromPeriodicNotes}, filename=${!!dateFromFilename}), headingFound=${!!plannerHeadingSectionPosition}, headingSetting="${settings.plannerHeading}"`,
-      );
-    }
-
     // Collect lines that are already handled by list items (to skip them in bold-time pass)
     const listItemLines = new Set<number>();
     if (cache.listItems) {
@@ -876,11 +870,6 @@ export function createIndexListener(props: {
     const contents = await vault.cachedRead(file);
 
     const denormalizedEntries = getListItemEntries(cache, contents, path);
-
-    const planEntryCount = denormalizedEntries.flatMap((it) => it.planEntries || []).length;
-    if (planEntryCount > 0 || path.includes("daily")) {
-      console.debug(`[day-planner] ${path}: ${denormalizedEntries.length} entries, ${planEntryCount} plan entries`);
-    }
 
     const flatListItemEntries = uniqBy(
       (it) => it.id,
