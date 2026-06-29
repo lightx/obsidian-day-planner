@@ -50,7 +50,7 @@
 
 <svelte:document
   on:mousemove={handleMove}
-  on:touchmove={handleMove}
+  on:touchmove|passive={handleMove}
   on:pointerup|capture={stopEdit}
 />
 <svelte:window on:blur={handleBlur} />

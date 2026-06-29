@@ -49,7 +49,7 @@ export function createResizeState() {
 
     onDestroyCallbacks.push(
       on(document, "mousemove", handleMove),
-      on(document, "touchmove", handleMove),
+      on(document, "touchmove", handleMove, { passive: true }),
       on(document, "mouseup", stopResizing, { capture: true }),
       on(document, "touchend", stopResizing, { capture: true }),
       on(document, "touchcancel", stopResizing, { capture: true }),
