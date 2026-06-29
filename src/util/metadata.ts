@@ -47,7 +47,9 @@ export function getHeadingSectionPosition(
     return undefined;
   }
 
-  const targetIndex = headings.findIndex((h) => h.heading === headingText);
+  const targetIndex = headings.findIndex(
+    (h) => h.heading.toLowerCase() === headingText.toLowerCase(),
+  );
 
   if (targetIndex === -1) {
     return undefined;
