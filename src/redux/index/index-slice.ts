@@ -394,6 +394,23 @@ function flatten<T extends { children?: T[]; id: string }>(
   ];
 }
 
+// Fallback: extract date from filename when Obsidian's periodic notes detection
+// doesn't recognize the file (e.g. Daily Notes plugin not configured).
+const dateInFilenameRegExp = /(\d{4}-\d{2}-\d{2})/;
+
+function extractDateFromFilename(path: string): Moment | null {
+  const fileName = path.split("/").pop() ?? path;
+  const match = fileName.match(dateInFilenameRegExp);
+
+  if (!match) {
+    return null;
+  }
+
+  const parsed = window.moment(match[1], "YYYY-MM-DD", true);
+
+  return parsed.isValid() ? parsed : null;
+}
+
 export function createIndexListener(props: {
   listPropsParser: ListPropsParser;
   vault: Vault;
@@ -568,7 +585,9 @@ export function createIndexListener(props: {
     contents: string,
     path: string,
   ) {
-    const dateFromPath = periodicNotes.getDateFromPath(path, "day");
+    const dateFromPath =
+      periodicNotes.getDateFromPath(path, "day") ??
+      extractDateFromFilename(path);
     const plannerHeadingSectionPosition = getHeadingSectionPosition(
       cache,
       settings.plannerHeading,
