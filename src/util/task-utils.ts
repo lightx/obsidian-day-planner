@@ -370,12 +370,9 @@ export function getBlockProps(task: Task, settings: DayPlannerSettings) {
 }
 
 export function toRenderableMarkdown(timeBlock: WithTime<LocalTask>) {
-  // Bold-time entries: render as **HH:MM** text, not as list items
+  // Bold-time entries: show only the text, not the time prefix
   if (timeBlock.isBoldTimeEntry) {
-    const fullLine = toString(timeBlock);
-    const firstLine = getFirstLine(fullLine);
-
-    const [, ...linesAfterFirst] = timeBlock.text.split("\n");
+    const [firstLine, ...linesAfterFirst] = timeBlock.text.split("\n");
 
     return {
       listItem: firstLine,
