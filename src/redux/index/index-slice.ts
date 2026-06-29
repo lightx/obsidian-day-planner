@@ -876,6 +876,11 @@ export function createIndexListener(props: {
 
     const denormalizedEntries = getListItemEntries(cache, contents, path);
 
+    const planEntryCount = denormalizedEntries.flatMap((it) => it.planEntries || []).length;
+    if (planEntryCount > 0 || path.includes("daily")) {
+      console.debug(`[day-planner] ${path}: ${denormalizedEntries.length} entries, ${planEntryCount} plan entries`);
+    }
+
     const flatListItemEntries = uniqBy(
       (it) => it.id,
       denormalizedEntries.flatMap(flatten),

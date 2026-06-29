@@ -155,5 +155,11 @@ export function getDayKeysInRange(start: Moment, end: Moment) {
 }
 
 export function strictParse(value: string) {
-  return window.moment(value, window.moment.ISO_8601, true);
+  const iso = window.moment(value, window.moment.ISO_8601, true);
+  if (iso.isValid()) {
+    return iso;
+  }
+  // Fallback: Obsidian's bundled moment may reject the space separator in strict
+  // ISO 8601 mode even though it's technically valid. Parse with explicit format.
+  return window.moment(value, "YYYY-MM-DD HH:mm:ss", true);
 }
