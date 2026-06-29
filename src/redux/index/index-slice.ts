@@ -585,13 +585,19 @@ export function createIndexListener(props: {
     contents: string,
     path: string,
   ) {
-    const dateFromPath =
-      periodicNotes.getDateFromPath(path, "day") ??
-      extractDateFromFilename(path);
+    const dateFromPeriodicNotes = periodicNotes.getDateFromPath(path, "day");
+    const dateFromFilename = extractDateFromFilename(path);
+    const dateFromPath = dateFromPeriodicNotes ?? dateFromFilename;
     const plannerHeadingSectionPosition = getHeadingSectionPosition(
       cache,
       settings.plannerHeading,
     );
+
+    if (dateFromPath) {
+      console.debug(
+        `[day-planner] indexing ${path}: date=${dateFromPath.format("YYYY-MM-DD")} (periodic=${!!dateFromPeriodicNotes}, filename=${!!dateFromFilename}), headingFound=${!!plannerHeadingSectionPosition}, headingSetting="${settings.plannerHeading}"`,
+      );
+    }
 
     // Collect lines that are already handled by list items (to skip them in bold-time pass)
     const listItemLines = new Set<number>();
