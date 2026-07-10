@@ -20,6 +20,12 @@
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .planner {
   position: relative;
 }
@@ -135,6 +141,26 @@
 
   .is-mobile & {
     --timeline-flex-basis: 120px;
+  }
+}
+
+[data-type="planner-timeline"],
+[data-type="planner-weekly"] {
+  --planner-time-block-font-size: var(--font-ui-small);
+
+  .is-mobile & {
+    --planner-time-block-font-size: var(--font-ui-smaller);
+  }
+}
+
+[data-type="planner-time-tracker"] {
+  --time-block-border: 1px solid var(--background-modifier-border);
+  --time-block-content-padding: var(--size-4-1);
+  --rendered-markdown-gap: var(--size-2-3);
+  --planner-time-block-font-size: var(--font-ui-small);
+
+  .workspace-split.mod-root & {
+    --time-block-bg-color: var(--background-primary-alt);
   }
 }
 

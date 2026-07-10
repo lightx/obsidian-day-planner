@@ -60,6 +60,7 @@
     >
       {#snippet children({ use, onpointerup, state })}
         <LocalTimeBlock
+          --time-block-border="1px solid var(--color-accent)"
           isActive={state === "secondary"}
           {onpointerup}
           {task}
@@ -79,7 +80,9 @@
                   );
                 }}
               >
-                <Square class="block-control-icon svg-icon" />
+                {#snippet icon()}
+                  <Square class="svg-icon" />
+                {/snippet}
               </ControlButton>
 
               <ControlButton
@@ -93,7 +96,9 @@
                   });
                 }}
               >
-                <EllipsisVertical class="block-control-icon svg-icon" />
+                {#snippet icon()}
+                  <EllipsisVertical class="svg-icon" />
+                {/snippet}
               </ControlButton>
             </BlockControls>
           {/snippet}
