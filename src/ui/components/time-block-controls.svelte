@@ -5,7 +5,7 @@
   import { timeRangeAtStartOfLineRegExp } from "../../regexp";
   import { type EditableTimeBlock } from "../../time-block-types";
   import { createMarkdownListTokens, getFirstLine } from "../../util/markdown";
-  import { createTimestamp } from "../../util/task-utils";
+  import { createTimestamp } from "../../util/time-block-utils";
   import { getMinutesSinceMidnight } from "../../util/moment";
   import type { HTMLActionArray } from "../actions/use-actions";
   import { createTimeBlockMenu } from "../time-block-menu";
