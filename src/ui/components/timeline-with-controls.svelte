@@ -1,17 +1,15 @@
 <script lang="ts">
   import { fromStore } from "svelte/store";
+  import { isNotVoid } from "typed-assert";
 
   import { getDateRangeContext } from "../../context/date-range-context";
   import { getObsidianContext } from "../../context/obsidian-context";
   import { getVisibleHours } from "../../global-store/derived-settings";
   import { settings } from "../../global-store/settings";
-  import type { Task } from "../../task-types";
-  import { createColumnSelectionMenu } from "../column-selection-menu";
+  import type { TimelineTimeBlock } from "../../time-block-types";
 
   import BlockList from "./block-list.svelte";
-  import ControlButton from "./control-button.svelte";
   import ErrorBoundary from "./error-boundary.svelte";
-  import Tree from "./obsidian/tree.svelte";
   import Ruler from "./ruler.svelte";
   import Scroller from "./scroller.svelte";
   import TimelineControls from "./timeline-controls.svelte";
@@ -23,7 +21,6 @@
   const getDisplayedAllDayTasksForMultiDayRow = fromStore(
     editContext.getDisplayedAllDayTasksForMultiDayRow,
   );
-  const editOperation = fromStore(editContext.editOperation);
 
   const dateRange = fromStore(getDateRangeContext());
   const firstDayInRange = $derived(dateRange.current[0]);
@@ -35,76 +32,70 @@
     }),
   );
 
-  function handleResizeableBoxPointerMove() {
+  let rulerRef: HTMLDivElement | undefined = $state();
+
+  function handleAllDayEventsPointerMove() {
+    const currentDate = dateRange.current[0];
+
+    isNotVoid(currentDate);
+
     pointerDateTime.set({
-      dateTime: dateRange.current[0],
+      dateTime: currentDate,
       type: "date",
     });
   }
 
-  const { timeTracker, planner } = $derived($settings.timelineColumns);
+  function handleScroll(event: Event) {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    if (rulerRef) {
+      rulerRef.scrollTop = event.target.scrollTop;
+    }
+  }
 </script>
 
 <ErrorBoundary>
-  <TimelineControls />
+  <div class="corner"></div>
 
-  {#if $settings.showUncheduledTasks}
-    <Tree
-      onpointermove={handleResizeableBoxPointerMove}
-      onpointerup={editContext.confirmEdit}
-      title="All day events"
+  <div bind:this={rulerRef} class="ruler">
+    <Ruler visibleHours={getVisibleHours($settings)} />
+    <div class="scrollbar-filler"></div>
+  </div>
+
+  <div class="controls-row">
+    <TimelineControls />
+  </div>
+
+  <!--  TODO: possibly no need for block list, it only makes things worse through its animation-->
+  <div
+    class="all-day-row"
+    onpointermove={handleAllDayEventsPointerMove}
+    onpointerup={editContext.confirmEdit}
+  >
+    <BlockList
+      --block-list-padding="var(--size-2-1) 3px 0"
+      className="all-day-events"
+      list={displayedAllDayTasks}
     >
-      {#snippet flair()}
-        {#if editOperation.current}
-          Drag here to schedule all-day events
-        {:else}
-          {String(displayedAllDayTasks.length)}
-        {/if}
+      {#snippet match(task: TimelineTimeBlock)}
+        <UnscheduledTimeBlock {task} />
       {/snippet}
-      {#if displayedAllDayTasks.length > 0}
-        <BlockList list={displayedAllDayTasks}>
-          {#snippet match(task: Task)}
-            <UnscheduledTimeBlock
-              --time-block-padding="var(--size-2-1) 0"
-              {task}
-            />
-          {/snippet}
-        </BlockList>
-      {/if}
-    </Tree>
-  {/if}
+      {#snippet fallback()}
+        <div class="empty-all-day-events">No all day events</div>
+      {/snippet}
+    </BlockList>
+  </div>
 
-  {#if $settings.showTimelineInSidebar}
-    <Tree title="Timeline">
-      {#snippet controls()}
-        <ControlButton
-          --border-radius="0"
-          label="Timeline Settings"
-          onclick={(event) => {
-            createColumnSelectionMenu({ settings, event });
-          }}
-        >
-          <span class="control-text">
-            {#if planner && timeTracker}
-              Planner | Tracker
-            {:else if planner}
-              Planner
-            {:else if timeTracker}
-              Tracker
-            {/if}
-          </span>
-        </ControlButton>
-      {/snippet}
-      <Scroller
-        class={["planner-timeline-scroller", "planner-flex-scrollable"]}
-      >
-        {#snippet children(isUnderCursor)}
-          <Ruler visibleHours={getVisibleHours($settings)} />
-          <Timeline day={firstDayInRange} {isUnderCursor} />
-        {/snippet}
-      </Scroller>
-    </Tree>
-  {/if}
+  <Scroller
+    class={["planner-timeline-scroller", "timeline-row"]}
+    onscroll={handleScroll}
+  >
+    {#snippet children(isUnderCursor)}
+      <Timeline day={firstDayInRange} {isUnderCursor} />
+    {/snippet}
+  </Scroller>
 </ErrorBoundary>
 
 <style>
@@ -113,20 +104,65 @@
     height: var(--icon-s);
   }
 
+  .corner {
+    grid-area: corner;
+    background-color: var(--background-primary);
+    border-block: var(--border-base);
+    border-inline-end: var(--border-base);
+  }
+
+  .ruler {
+    overflow-y: hidden;
+    grid-area: ruler;
+    box-shadow: var(--shadow-right);
+  }
+
+  .scrollbar-filler {
+    height: var(--scrollbar-width);
+    background-color: var(--background-primary);
+  }
+
+  .controls-row {
+    grid-area: controls;
+  }
+
+  .all-day-row {
+    overflow: auto;
+    grid-area: all-day;
+
+    max-height: 16vh;
+
+    background-color: var(--background-primary);
+    border-block-end: var(--border-base);
+  }
+
+  :global(.timeline-row) {
+    grid-area: timeline;
+  }
+
   :global(.planner-timeline-scroller) {
-    border-top: var(--border-base);
+    overflow: auto;
   }
 
   :global(.unscheduled-task-container) {
     overflow: auto;
   }
 
-  .control-text {
+  .empty-all-day-events {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding-block: var(--size-4-2);
+
     font-size: var(--font-ui-small);
     color: var(--text-faint);
   }
 
-  .control-text:hover {
-    color: var(--text-muted);
+  /* todo: scoping */
+  :global(.all-day-events),
+  .empty-all-day-events {
+    background-color: var(--background-primary);
+    border-top: 1px solid var(--background-modifier-border);
   }
 </style>

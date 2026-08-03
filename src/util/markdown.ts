@@ -7,7 +7,7 @@ import {
   listTokenWithSpacesRegExp,
 } from "../regexp";
 import type { DayPlannerSettings } from "../settings";
-import type { ListItemTokens } from "../task-types";
+import type { ListItemTokens } from "../time-block-types";
 
 const baseIndentation = "\t";
 
@@ -59,6 +59,10 @@ export function getFirstLine(text: string) {
 
 export function getLinesAfterFirst(text: string) {
   return text.split("\n").slice(1).join("\n");
+}
+
+export function removeMarkdownExtension(path: string) {
+  return path.replace(/\.md$/, "");
 }
 
 export function removeListTokens(text: string) {
@@ -191,6 +195,7 @@ export interface Node {
   symbol: string;
   children?: Node[];
   status?: string;
+  isBoldTimeEntry?: boolean;
 }
 
 export function getIndentationForListParagraph() {

@@ -10,6 +10,7 @@ import { combineSlices, configureStore } from "@reduxjs/toolkit";
 import type { MetadataCache, Vault } from "obsidian";
 import { toStore, writable } from "svelte/store";
 
+import type { IndexService } from "../service/index/index-service";
 import type { ListPropsParser } from "../service/list-props-parser";
 import type { PeriodicNotes } from "../service/periodic-notes";
 import type { DayPlannerSettings } from "../settings";
@@ -54,6 +55,7 @@ export const makeStore = (
 export function createReactor(props: {
   preloadedState?: Partial<RootState>;
   listPropsParser: ListPropsParser;
+  indexServices: IndexService[];
   vault: Vault;
   metadataCache: MetadataCache;
   periodicNotes: PeriodicNotes;
@@ -63,6 +65,7 @@ export function createReactor(props: {
   const {
     preloadedState = {},
     listPropsParser,
+    indexServices,
     vault,
     metadataCache,
     periodicNotes,
@@ -73,6 +76,7 @@ export function createReactor(props: {
   const listenerMiddleware = initListenerMiddleware({
     extra: {
       listPropsParser,
+      indexServices,
       vault,
       metadataCache,
       periodicNotes,

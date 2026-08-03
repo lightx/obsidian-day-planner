@@ -1,34 +1,35 @@
 import { App, Modal } from "obsidian";
 import { mount, unmount } from "svelte";
-import { isNotVoid } from "typed-assert";
 
 import { clockFormat } from "../constants";
-import {
-  ListItemEntryEditor,
-  runWithNoticeOnError,
-} from "../service/list-item-entry-editor";
-import type { LocalTask } from "../task-types";
+import type { LogEntryEditor } from "../service/log-entry-editor";
+import type { LogTimeBlock } from "../time-block-types";
+import { runWithNoticeOnError } from "../util/effect";
 import { getFirstLine } from "../util/markdown";
-import { getEndTime } from "../util/task-utils";
+import { getEndTime } from "../util/time-block-utils";
 
 import TimeEntryEditModal from "./components/time-entry-edit-modal.svelte";
 
 export function createEditTimeEntryModalCreator(
   app: App,
-  taskEntryEditor: ListItemEntryEditor,
+  logEntryEditor: LogEntryEditor,
 ) {
-  return (task: LocalTask) => {
-    const { location } = task;
-
-    isNotVoid(location);
-
-    const initialStart = task.startTime.format(clockFormat);
-    const initialEnd = task.durationMinutes
-      ? getEndTime(task).format(clockFormat)
-      : window.moment().format(clockFormat);
+  // todo: separate LogTimeBlockView (clamped) & LogTimeBlock
+  return (
+    timeBlock: LogTimeBlock,
+    logEntry?: { start: string; end?: string },
+  ) => {
+    const initialStart = logEntry
+      ? logEntry.start
+      : timeBlock.startTime.format(clockFormat);
+    const initialEnd = logEntry
+      ? (logEntry.end ?? window.moment().format(clockFormat))
+      : timeBlock.durationMinutes
+        ? getEndTime(timeBlock).format(clockFormat)
+        : window.moment().format(clockFormat);
 
     const modal = new Modal(app).setTitle(
-      `Edit time entry: ${getFirstLine(task.text)}`,
+      `Edit time entry: ${getFirstLine(timeBlock.text)}`,
     );
 
     const component = mount(TimeEntryEditModal, {
@@ -38,10 +39,12 @@ export function createEditTimeEntryModalCreator(
         initialEnd,
         onConfirm: async ({ start, end }: { start: string; end?: string }) => {
           await runWithNoticeOnError(
-            taskEntryEditor.editLastClockAtLocation(
-              { path: location.path, line: location.position.start.line },
-              { start, end },
-            ),
+            logEntry
+              ? logEntryEditor.editClock(timeBlock, {
+                  originalStart: logEntry.start,
+                  patch: { start, end },
+                })
+              : logEntryEditor.editLastClock(timeBlock, { start, end }),
           );
 
           modal.close();

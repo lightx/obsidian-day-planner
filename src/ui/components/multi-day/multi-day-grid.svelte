@@ -7,6 +7,7 @@
   import { getObsidianContext } from "../../../context/obsidian-context";
   import { isToday } from "../../../global-store/current-time";
   import { getVisibleHours } from "../../../global-store/derived-settings";
+  import { isLastIndexOf } from "../../../util/array";
   import { isOnWeekend } from "../../../util/moment";
   import {
     getNextAdjacentRange,
@@ -118,87 +119,90 @@
   const { startResizing, resizeAction } = createResizeState();
 </script>
 
-<div class="corner">
-  {#if $settings.showUncheduledTasks}
-    <GripHorizontal
-      class="horizontal-grip"
-      onmousedown={startResizing}
-      ontouchstart={startResizing}
-    />
-  {/if}
-</div>
-
-<div bind:this={rulerRef} class="ruler">
-  <Ruler
-    --ruler-box-shadow="var(--shadow-right)"
-    visibleHours={getVisibleHours($settings)}
-  />
-  <div class="scrollbar-filler"></div>
-</div>
-
-<div
-  bind:this={daysRef}
-  style:--timeline-internal-column-count={timelineInternalColumnCount}
-  class={["planner-header-row", "day-buttons"]}
->
-  {#each $dateRange as day}
-    <div class="header-cell">
-      <ControlButton
-        --border-radius="0"
-        label="Open note for day"
-        onclick={async () => {
-          await workspaceFacade.openFileForDay(day);
-        }}
-      >
-        {#if $isToday(day)}
-          🔵
-        {/if}
-
-        {day.format($settings.timelineDateFormat)}
-      </ControlButton>
-    </div>
-  {/each}
-</div>
-
-{#if $settings.showUncheduledTasks}
-  <div
-    style:--timeline-internal-column-count={timelineInternalColumnCount}
-    class={["planner-header-row", "horizontal-resize-box-wrapper"]}
-    use:resizeAction
-  >
-    <!--Note: we need this wrapper to listen to pointer events on the whole height of the row-->
-    <div
-      bind:this={multiDayRowRef}
-      class="multi-day-row-wrapper"
-      onpointermove={handlePointerMove}
-      onpointerup={editContext.confirmEdit}
-    >
-      <MultiDayRow />
-    </div>
-    <ColumnTracksOverlay
-      columnCount={$dateRange.length}
-      bind:el={columnTrackOverlayEl}
-    />
-  </div>
-{/if}
-
-{#if visibleSideControls !== "none"}
-  <div
-    class="side-controls-wrapper"
-    transition:slide={createSlide({ axis: "x" })}
-  >
-    {#if visibleSideControls === "settings"}
-      <SettingsControls />
+<ErrorBoundary>
+  <div class="corner">
+    {#if $settings.showUncheduledTasks}
+      <GripHorizontal
+        class="horizontal-grip"
+        onmousedown={startResizing}
+        ontouchstart={startResizing}
+      />
     {/if}
   </div>
-{/if}
 
-<ErrorBoundary>
+  <div bind:this={rulerRef} class="ruler">
+    <Ruler
+      --ruler-box-shadow="var(--shadow-right)"
+      visibleHours={getVisibleHours($settings)}
+    />
+    <div class="scrollbar-filler"></div>
+  </div>
+
+  <div
+    bind:this={daysRef}
+    style:--timeline-internal-column-count={timelineInternalColumnCount}
+    class={["planner-header-row", "day-buttons"]}
+  >
+    {#each $dateRange as day}
+      <div class="header-cell">
+        <ControlButton
+          --border-radius="0"
+          label="Open note for day"
+          onclick={async () => {
+            await workspaceFacade.openFileForDay(day);
+          }}
+        >
+          {#if $isToday(day)}
+            🔵
+          {/if}
+
+          {day.format($settings.timelineDateFormat)}
+        </ControlButton>
+      </div>
+    {/each}
+  </div>
+
+  {#if $settings.showUncheduledTasks}
+    <div
+      style:--timeline-internal-column-count={timelineInternalColumnCount}
+      class={["planner-header-row", "horizontal-resize-box-wrapper"]}
+      use:resizeAction
+    >
+      <!--Note: we need this wrapper to listen to pointer events on the whole height of the row-->
+      <div
+        bind:this={multiDayRowRef}
+        class="multi-day-row-wrapper"
+        onpointermove={handlePointerMove}
+        onpointerup={editContext.confirmEdit}
+      >
+        <MultiDayRow />
+      </div>
+      <ColumnTracksOverlay
+        columnCount={$dateRange.length}
+        bind:el={columnTrackOverlayEl}
+      />
+    </div>
+  {/if}
+
+  {#if visibleSideControls !== "none"}
+    <div
+      class="side-controls-wrapper"
+      transition:slide={createSlide({ axis: "x" })}
+    >
+      {#if visibleSideControls === "settings"}
+        <SettingsControls />
+      {/if}
+    </div>
+  {/if}
+
   <div class="multi-day-main-content">
     <Scroller class="planner-multi-day-scroller" onscroll={handleScroll}>
-      {#each $dateRange as day}
+      {#each $dateRange as day, index}
         <Timeline
           --column-background-color={getColumnBackgroundColor(day)}
+          --timeline-border-inline-end={isLastIndexOf($dateRange, index)
+            ? "none"
+            : "var(--border-base)"}
           {day}
           isUnderCursor={true}
         />

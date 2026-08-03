@@ -1,5 +1,4 @@
-import { Either, pipe } from "effect";
-import { takeWhile } from "lodash/fp";
+import { Array, Either, pipe } from "effect";
 import { stringifyYaml } from "obsidian";
 import { z } from "zod";
 
@@ -18,7 +17,7 @@ import {
   indent,
 } from "./markdown";
 import { strictParse } from "./moment";
-import { appendText } from "./task-utils";
+import { appendText } from "./time-block-utils";
 
 const dateTimeSchema = z.string().refine((it) => strictParse(it).isValid());
 
@@ -72,6 +71,10 @@ export function addOpenClock(props: Props): Props {
       ],
     },
   };
+}
+
+export function addOpenClockOrCreateProps(props?: Props): Props {
+  return props ? addOpenClock(props) : createPropsWithOpenClock();
 }
 
 export function cancelOpenClock(props: Props): Props {
@@ -157,6 +160,43 @@ export function editLogEntry(
   };
 }
 
+export function deleteLogEntry(props: Props, originalStart: string): Props {
+  const log = props.planner?.log;
+
+  if (!log) {
+    throw new Error("No log entries");
+  }
+
+  const index = log.findIndex((it) => it.start === originalStart);
+
+  if (index === -1) {
+    throw new Error(`Log entry not found: ${originalStart}`);
+  }
+
+  return {
+    ...props,
+    planner: {
+      ...props.planner,
+      log: log.toSpliced(index, 1),
+    },
+  };
+}
+
+export function editLastLogEntry(
+  props: Props,
+  patch: { start?: string; end?: string },
+): Props {
+  const log = props.planner?.log;
+
+  if (!log?.length) {
+    throw new Error("No log entries");
+  }
+
+  const last = log[log.length - 1];
+
+  return editLogEntry(props, { originalStart: last.start, patch });
+}
+
 export function createProp(
   key: string,
   value: string,
@@ -186,9 +226,9 @@ export function updateProp(
 }
 
 export function deleteProps(text: string) {
-  return takeWhile(
-    (line) => !line.trimStart().startsWith(codeFence),
+  return Array.takeWhile(
     text.split("\n"),
+    (line) => !line.trimStart().startsWith(codeFence),
   )
     .join("\n")
     .replaceAll(propRegexp, "")

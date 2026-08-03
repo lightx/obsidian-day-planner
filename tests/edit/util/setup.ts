@@ -1,4 +1,4 @@
-import { noop } from "lodash/fp";
+import { Function } from "effect";
 import type { Moment } from "moment/moment";
 import moment from "moment/moment";
 import { writable } from "svelte/store";
@@ -10,7 +10,7 @@ import {
   type DayPlannerSettings,
   defaultSettingsForTests,
 } from "../../../src/settings";
-import type { LocalTask } from "../../../src/task-types";
+import type { EditableTimeBlock } from "../../../src/time-block-types";
 import type { PointerDateTime } from "../../../src/types";
 import { useEditContext } from "../../../src/ui/hooks/use-edit/use-edit-context";
 
@@ -20,7 +20,7 @@ function createProps({
   tasks,
   settings,
 }: {
-  tasks: LocalTask[];
+  tasks: EditableTimeBlock[];
   settings: DayPlannerSettings;
 }) {
   const onUpdate = vi.fn().mockResolvedValue(true);
@@ -62,8 +62,8 @@ export function setUp({
   } = useEditContext(props);
 
   // this prevents the store from resetting;
-  dayToDisplayedTasks.subscribe(noop);
-  getDisplayedAllDayTasksForMultiDayRow.subscribe(noop);
+  dayToDisplayedTasks.subscribe(Function.constVoid);
+  getDisplayedAllDayTasksForMultiDayRow.subscribe(Function.constVoid);
 
   function moveCursorTo(
     dateTime: Moment,

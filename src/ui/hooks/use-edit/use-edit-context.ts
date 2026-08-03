@@ -1,4 +1,4 @@
-import { flow, uniqBy } from "lodash/fp";
+import { Array, pipe } from "effect";
 import type { Moment } from "moment";
 import { derived, type Readable, writable } from "svelte/store";
 
@@ -7,18 +7,19 @@ import type { PeriodicNotes } from "../../../service/periodic-notes";
 import { WorkspaceFacade } from "../../../service/workspace-facade";
 import type { DayPlannerSettings } from "../../../settings";
 import type {
-  LocalTask,
-  Task,
+  EditableTimeBlock,
+  RemoteTimeBlock,
+  TimelineTimeBlock,
   WithPlacing,
-  WithTime,
-} from "../../../task-types";
+  WithDuration,
+} from "../../../time-block-types";
 import type {
   OnEditAbortedFn,
   OnUpdateFn,
   PointerDateTime,
 } from "../../../types";
 import * as m from "../../../util/moment";
-import * as t from "../../../util/task-utils";
+import * as t from "../../../util/time-block-utils";
 
 import { createEditHandlers } from "./create-edit-handlers";
 import { useCursor } from "./cursor";
@@ -26,25 +27,27 @@ import { transform } from "./transform/transform";
 import type { EditOperation } from "./types";
 import { useEditActions } from "./use-edit-actions";
 
-function groupByDay(tasks: Task[]) {
-  return tasks.reduce<Record<string, { withTime: Task[]; noTime: Task[] }>>(
-    (result, task) => {
-      const key = t.getDayKey(task.startTime);
+function groupByDay(timeBlocks: TimelineTimeBlock[]) {
+  return timeBlocks.reduce<
+    Record<
+      string,
+      { withTime: TimelineTimeBlock[]; noTime: TimelineTimeBlock[] }
+    >
+  >((result, timeBlock) => {
+    const key = t.getDayKey(timeBlock.startTime);
 
-      if (!result[key]) {
-        result[key] = { withTime: [], noTime: [] };
-      }
+    if (!result[key]) {
+      result[key] = { withTime: [], noTime: [] };
+    }
 
-      if (task.isAllDayEvent) {
-        result[key].noTime.push(task);
-      } else {
-        result[key].withTime.push(task);
-      }
+    if (timeBlock.isAllDayEvent) {
+      result[key].noTime.push(timeBlock);
+    } else {
+      result[key].withTime.push(timeBlock);
+    }
 
-      return result;
-    },
-    {},
-  );
+    return result;
+  }, {});
 }
 
 export function useEditContext(props: {
@@ -52,8 +55,8 @@ export function useEditContext(props: {
   periodicNotes: PeriodicNotes;
   onUpdate: OnUpdateFn;
   settings: Readable<DayPlannerSettings>;
-  localTasks: Readable<LocalTask[]>;
-  remoteTasks: Readable<Task[]>;
+  localTasks: Readable<EditableTimeBlock[]>;
+  remoteTasks: Readable<RemoteTimeBlock[]>;
   pointerDateTime: Readable<PointerDateTime>;
   abortEditTrigger: Readable<unknown>;
   onEditAborted: OnEditAbortedFn;
@@ -64,8 +67,8 @@ export function useEditContext(props: {
     onEditAborted,
     onUpdate,
     settings,
-    localTasks,
-    remoteTasks,
+    localTasks: localTimeBlocks,
+    remoteTasks: remoteTimeBlocks,
     pointerDateTime,
     abortEditTrigger,
   } = props;
@@ -88,31 +91,38 @@ export function useEditContext(props: {
   );
   const cursor = useCursor(editOperation);
 
-  const localFilteredTasks = derived(
-    [localTasks, settings],
-    ([$localTasks, $settings]) =>
+  const localFilteredTimeBlocks = derived(
+    [localTimeBlocks, settings],
+    ([$localTimeBlocks, $settings]) =>
       $settings.showCompletedTasks
-        ? $localTasks
-        : $localTasks.filter((it) => it.task?.toLowerCase() !== "x"),
+        ? $localTimeBlocks
+        : $localTimeBlocks.filter(
+            (it) => !it.task || it.task.toLowerCase() !== "x",
+          ),
   );
 
-  const baselineTasks = writable<LocalTask[]>([], (set) => {
-    return localFilteredTasks.subscribe(set);
+  const baselineTimeBlocks = writable<EditableTimeBlock[]>([], (set) => {
+    return localFilteredTimeBlocks.subscribe(set);
   });
 
-  const tasksWithPendingUpdate = derived(
-    [editOperation, baselineTasks, settings, pointerDateTime],
-    ([$editOperation, $baselineTasks, $settings, $pointerDateTime]) => {
+  const timeBlocksWithPendingUpdate = derived(
+    [editOperation, baselineTimeBlocks, settings, pointerDateTime],
+    ([$editOperation, $baselineTimeBlocks, $settings, $pointerDateTime]) => {
       return $editOperation
-        ? transform($baselineTasks, $editOperation, $settings, $pointerDateTime)
-        : $baselineTasks;
+        ? transform(
+            $baselineTimeBlocks,
+            $editOperation,
+            $settings,
+            $pointerDateTime,
+          )
+        : $baselineTimeBlocks;
     },
   );
 
   const { startEdit, confirmEdit, cancelEdit } = useEditActions({
     editOperation,
-    baselineTasks,
-    tasksWithPendingUpdate,
+    baselineTasks: baselineTimeBlocks,
+    tasksWithPendingUpdate: timeBlocksWithPendingUpdate,
     onUpdate,
   });
 
@@ -125,82 +135,103 @@ export function useEditContext(props: {
     settings,
   });
 
-  const combinedTasks = derived(
-    [remoteTasks, tasksWithPendingUpdate],
-    ([$remoteTasks, $tasksWithPendingUpdate]) =>
-      $remoteTasks.concat($tasksWithPendingUpdate),
+  const combinedTimeBlocks = derived(
+    [remoteTimeBlocks, timeBlocksWithPendingUpdate],
+    ([
+      $remoteTimeBlocks,
+      $timeBlocksWithPendingUpdate,
+    ]): TimelineTimeBlock[] => [
+      ...$remoteTimeBlocks,
+      ...$timeBlocksWithPendingUpdate,
+    ],
   );
 
-  const dayToDisplayedTasks = derived(combinedTasks, ($combinedTasks) => {
-    const split: Task[] = $combinedTasks.flatMap((task): Task[] | Task => {
-      if (!t.isWithTime(task) || task.isAllDayEvent) {
-        return task;
-      }
+  const dayToDisplayedTimeBlocks = derived(
+    combinedTimeBlocks,
+    ($combinedTimeBlocks) => {
+      const split: TimelineTimeBlock[] = $combinedTimeBlocks.flatMap(
+        (timeBlock): TimelineTimeBlock[] | TimelineTimeBlock => {
+          if (!t.isWithDuration(timeBlock) || timeBlock.isAllDayEvent) {
+            return timeBlock;
+          }
 
-      const daySpan = t.getEndTime(task).diff(task.startTime, "days");
-      const shouldGoToMultiDayRow = daySpan > 1;
+          const daySpan = t
+            .getEndTime(timeBlock)
+            .diff(timeBlock.startTime, "days");
+          const shouldGoToMultiDayRow = daySpan > 1;
 
-      if (shouldGoToMultiDayRow) {
-        return task;
-      }
+          if (shouldGoToMultiDayRow) {
+            return timeBlock;
+          }
 
-      const chunks = m.splitMultiday(task.startTime, t.getEndTime(task));
+          const chunks = m.splitMultiday(
+            timeBlock.startTime,
+            t.getEndTime(timeBlock),
+          );
 
-      return chunks.map(([startTime, endTime]) => ({
-        ...task,
-        startTime,
-        durationMinutes: m.getDiffInMinutes(startTime, endTime),
-      }));
-    });
+          return chunks.map(([startTime, endTime]) => ({
+            ...timeBlock,
+            startTime,
+            durationMinutes: m.getDiffInMinutes(startTime, endTime),
+          }));
+        },
+      );
 
-    return groupByDay(split);
-  });
+      return groupByDay(split);
+    },
+  );
 
-  const getDisplayedAllDayTasksForMultiDayRow = derived(
-    [combinedTasks],
-    ([$combinedTasks]) =>
+  const getDisplayedAllDayTimeBlocksForMultiDayRow = derived(
+    [combinedTimeBlocks],
+    ([$combinedTimeBlocks]) =>
       (range: m.Range) => {
         const startOfRange = range.start.clone().startOf("day");
         const endOfRange = range.end.clone().add(1, "day").startOf("day");
 
-        return $combinedTasks
-          .filter((task) => {
+        return $combinedTimeBlocks
+          .filter((timeBlock) => {
             // TODO: a limitation to be removed later
-            if (!task.isAllDayEvent) {
+            if (!timeBlock.isAllDayEvent) {
               return false;
             }
 
-            if ("durationMinutes" in task) {
+            if (t.isWithDuration(timeBlock)) {
               return m.doesOverlapWithRange(
                 {
-                  start: task.startTime,
-                  end: t.getEndTime(task),
+                  start: timeBlock.startTime,
+                  end: t.getEndTime(timeBlock),
                 },
                 { start: startOfRange, end: endOfRange },
               );
             }
 
-            return m.isWithinRange(task.startTime, range);
+            return m.isWithinRange(timeBlock.startTime, range);
           })
           .map(
-            (task): Task =>
-              t.isWithTime(task) ? t.truncateToRange(task, range) : task,
+            (timeBlock): TimelineTimeBlock =>
+              t.isWithDuration(timeBlock)
+                ? t.truncateToRange(timeBlock, range)
+                : timeBlock,
           );
       },
   );
 
-  function getDisplayedTasksForTimeline(day: Moment) {
-    return derived(dayToDisplayedTasks, ($dayToDisplayedTasks) => {
-      const tasksForDay =
-        $dayToDisplayedTasks[t.getDayKey(day)] || t.getEmptyTasksForDay();
+  function getDisplayedTimeBlocksForTimeline(day: Moment) {
+    return derived(dayToDisplayedTimeBlocks, ($dayToDisplayedTimeBlocks) => {
+      const timeBlocksForDay =
+        $dayToDisplayedTimeBlocks[t.getDayKey(day)] ||
+        t.getEmptyTimeBlocksForDay();
 
-      const withTime: Array<WithPlacing<WithTime<Task>>> = flow(
-        uniqBy(t.getRenderKey),
-        addHorizontalPlacing,
-      )(tasksForDay.withTime);
+      const withTime: Array<WithPlacing<WithDuration<TimelineTimeBlock>>> =
+        // todo: fix `as`
+        pipe(
+          timeBlocksForDay.withTime as Array<WithDuration<TimelineTimeBlock>>,
+          Array.dedupeWith((a, b) => t.getRenderKey(a) === t.getRenderKey(b)),
+          addHorizontalPlacing,
+        );
 
       return {
-        ...tasksForDay,
+        ...timeBlocksForDay,
         withTime,
       };
     });
@@ -209,11 +240,12 @@ export function useEditContext(props: {
   return {
     handlers,
     cursor,
-    dayToDisplayedTasks,
+    dayToDisplayedTasks: dayToDisplayedTimeBlocks,
     confirmEdit,
     cancelEdit,
     editOperation,
-    getDisplayedTasksForTimeline,
-    getDisplayedAllDayTasksForMultiDayRow,
+    getDisplayedTasksForTimeline: getDisplayedTimeBlocksForTimeline,
+    getDisplayedAllDayTasksForMultiDayRow:
+      getDisplayedAllDayTimeBlocksForMultiDayRow,
   };
 }

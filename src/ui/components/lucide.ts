@@ -1,12 +1,10 @@
-// TODO: remove this once lucide is aware of Svelte 5 component typings
-// @ts-nocheck
+// @ts-nocheck TODO: remove this once we raise Lucide version
 import * as lucideSvelte from "lucide-svelte";
 import type { Component, ComponentProps } from "svelte";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const obsidianIcon =
-  <T extends Component<any>>(IconComponent: T) =>
-  (internals: any, props: ComponentProps<T>) => {
+  <T extends Component>(IconComponent: T) =>
+  (internals: unknown, props: ComponentProps<T>) => {
     const newProps = {
       ...props,
       ["class"]: `${props.class || ""} svg-icon`,
@@ -14,7 +12,6 @@ const obsidianIcon =
 
     return IconComponent(internals, newProps);
   };
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export const Ellipsis = obsidianIcon(lucideSvelte.Ellipsis);
@@ -34,4 +31,6 @@ export const GripHorizontal = obsidianIcon(lucideSvelte.GripHorizontal);
 export const Play = obsidianIcon(lucideSvelte.Play);
 export const SkipForward = obsidianIcon(lucideSvelte.SkipForward);
 export const StepForward = obsidianIcon(lucideSvelte.StepForward);
+export const Timer = obsidianIcon(lucideSvelte.Timer);
+export const Clock = obsidianIcon(lucideSvelte.Clock);
 /* eslint-enable @typescript-eslint/naming-convention */

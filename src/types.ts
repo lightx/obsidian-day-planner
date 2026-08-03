@@ -6,13 +6,14 @@ import type { Readable, Writable } from "svelte/store";
 import type { IcalParseTaskResult } from "./redux/ical/init-ical-listeners";
 import { type AppDispatch, type RootState } from "./redux/store";
 import type { UseSelector } from "./redux/use-selector";
-import type { ListItemEntryEditor } from "./service/list-item-entry-editor";
+import type { IndexService } from "./service/index/index-service";
 import type { ListPropsParser } from "./service/list-props-parser";
+import type { LogEntryEditor } from "./service/log-entry-editor";
 import type { PeriodicNotes } from "./service/periodic-notes";
 import type { VaultFacade } from "./service/vault-facade";
 import type { WorkspaceFacade } from "./service/workspace-facade";
 import type { DayPlannerSettings, IcalConfig } from "./settings";
-import type { LocalTask } from "./task-types";
+import type { EditableTimeBlock, PlanTimeBlock } from "./time-block-types";
 import type { OpenEditTimeEntryModal } from "./ui/create-edit-time-entry-modal";
 import { EditMode } from "./ui/hooks/use-edit/types";
 import { useEditContext } from "./ui/hooks/use-edit/use-edit-context";
@@ -21,8 +22,8 @@ import { type ShowPreview } from "./util/create-show-preview";
 import type { Scheduler } from "./util/scheduler";
 
 export type OnUpdateFn = (
-  base: Array<LocalTask>,
-  next: Array<LocalTask>,
+  base: Array<EditableTimeBlock>,
+  next: Array<EditableTimeBlock>,
   mode: EditMode,
 ) => Promise<boolean>;
 
@@ -62,8 +63,9 @@ export interface ObsidianContext {
   settings: Writable<DayPlannerSettings>;
   settingsSignal: Signal<DayPlannerSettings>;
   pointerDateTime: Writable<PointerDateTime>;
-  taskEntryEditor: ListItemEntryEditor;
+  logEntryEditor: LogEntryEditor;
   openEditTimeEntryModal: OpenEditTimeEntryModal;
+  openClockInOnAnythingModal: () => void;
   // todo: rename to promptUserToEditText
   editText: (props: {
     initialText?: string;
@@ -74,6 +76,7 @@ export interface ObsidianContext {
     position: { line: number; col: number };
     contents: string;
   }) => Promise<void>;
+  deleteTask: (task: PlanTimeBlock) => Promise<void>;
   dispatch: AppDispatch;
   useSelector: UseSelector<RootState>;
 }
@@ -97,6 +100,7 @@ export type DateRange = Writable<Moment[]> & { untrack: () => void };
 export type ReduxExtraArgument = {
   settings: DayPlannerSettings;
   listPropsParser: ListPropsParser;
+  indexServices: IndexService[];
   vault: Vault;
   metadataCache: MetadataCache;
   periodicNotes: PeriodicNotes;

@@ -12,7 +12,7 @@ import {
   selectEntriesForPath,
 } from "../../src/redux/index/index-slice";
 import { strictParse } from "../../src/util/moment";
-import { getDayKey } from "../../src/util/task-utils";
+import { getDayKey } from "../../src/util/time-block-utils";
 
 import { setUp } from "./util/setup";
 
@@ -59,12 +59,12 @@ describe("Indexing", () => {
   test("Returns time block views for active log entries", async () => {
     const { getState } = await setUp();
 
-    expect(selectActiveLogEntries(getState())).toMatchObject([
-      {
+    expect(selectActiveLogEntries(getState())).toContainEqual(
+      expect.objectContaining({
         text: expect.stringContaining("Task"),
         startTime: window.moment("2025-01-01 17:00"),
-      },
-    ]);
+      }),
+    );
   });
 
   test("Deletes entries on file deletion", async () => {

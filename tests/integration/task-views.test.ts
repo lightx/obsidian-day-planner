@@ -4,8 +4,8 @@ import { describe, expect, test } from "vitest";
 
 import { selectPlanEntriesForDays } from "../../src/redux";
 import { defaultSettingsForTests } from "../../src/settings";
-import { isLocal } from "../../src/task-types";
-import { toRenderableMarkdown } from "../../src/util/task-utils";
+import { isLocal } from "../../src/time-block-types";
+import { toRenderableMarkdown } from "../../src/util/time-block-utils";
 
 import { setUp } from "./util/setup";
 
@@ -29,8 +29,7 @@ describe("Task views", () => {
     expect(listItem).toBe("- [ ] Parent");
     expect(nestedListItems).toBe(`- [ ] Child task
   Child text
-\t- Child list item without time
-`);
+\t- Child list item without time`);
   });
 
   test("Removes list tokens for plain list items", async () => {

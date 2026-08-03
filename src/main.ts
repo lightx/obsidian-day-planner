@@ -12,6 +12,7 @@ import {
   icalParseLowerLimit,
 } from "./constants";
 import {
+  createDeleteTaskHandler,
   createEditLineHandler,
   createUpdateHandler,
   getTextFromUser,
@@ -42,16 +43,27 @@ import {
 } from "./redux/store";
 import { type UseSelector } from "./redux/use-selector";
 import { TransactionWriter } from "./service/diff-writer";
-import { ListItemEntryEditor } from "./service/list-item-entry-editor";
+import { createYamlEditTargets } from "./service/edit-yaml";
+import { createIndexServices } from "./service/index/create-index-services";
 import { ListPropsParser } from "./service/list-props-parser";
+import { LogEntryEditor } from "./service/log-entry-editor";
 import { MetadataCacheFacade } from "./service/metadata-cache-facade";
 import { PeriodicNotes } from "./service/periodic-notes";
+import {
+  DefaultSearchOrderingService,
+  type SearchOrderingService,
+} from "./service/search-ordering-service";
+import {
+  type SearchService,
+  VaultSearchService,
+} from "./service/search-service";
 import { VaultFacade } from "./service/vault-facade";
 import { WorkspaceFacade } from "./service/workspace-facade";
 import { type DayPlannerSettings, defaultSettings } from "./settings";
-import type { LocalTask, RemoteTask } from "./task-types";
 import { createGetTasksApi } from "./tasks-plugin";
+import type { EditableTimeBlock, RemoteTimeBlock } from "./time-block-types";
 import type { ObsidianContext, OnUpdateFn, PointerDateTime } from "./types";
+import { ClockInOnAnythingModal } from "./ui/clock-in-on-anything-modal";
 import { askForConfirmation } from "./ui/confirmation-modal";
 import { createEditTimeEntryModalCreator } from "./ui/create-edit-time-entry-modal";
 import { createEditorMenuCallback } from "./ui/editor-menu";
@@ -68,6 +80,7 @@ import { UndoNotice } from "./ui/undo-notice";
 import { createEnvironmentHooks } from "./util/create-environment-hooks";
 import { createRenderMarkdown } from "./util/create-render-markdown";
 import { createShowPreview } from "./util/create-show-preview";
+import { runWithNoticeOnError } from "./util/effect";
 import { notifyAboutStartedTasks } from "./util/notify-about-started-tasks";
 import { createBackgroundBatchScheduler } from "./util/scheduler";
 
@@ -76,11 +89,23 @@ export default class DayPlanner extends Plugin {
   private settingsStore!: Writable<DayPlannerSettings>;
   private workspaceFacade!: WorkspaceFacade;
   private periodicNotes!: PeriodicNotes;
-  private taskEntryEditor!: ListItemEntryEditor;
+  private logEntryEditor!: LogEntryEditor;
   private vaultFacade!: VaultFacade;
+  private searchService!: SearchService;
+  private searchOrderingService!: SearchOrderingService;
   private transactionWriter!: TransactionWriter;
   private metadataCacheFacade!: MetadataCacheFacade;
   private undoNotice!: UndoNotice;
+
+  private openClockInOnAnythingModal = () => {
+    new ClockInOnAnythingModal(
+      this.app,
+      this.searchService,
+      this.searchOrderingService,
+      this.vaultFacade,
+      this.logEntryEditor,
+    ).open();
+  };
 
   async onload() {
     const { vault, metadataCache } = this.app;
@@ -94,6 +119,12 @@ export default class DayPlanner extends Plugin {
     const listPropsParser = new ListPropsParser(vault, metadataCache);
 
     this.periodicNotes = new PeriodicNotes();
+
+    const indexServices = createIndexServices({
+      listPropsParser,
+      periodicNotes: this.periodicNotes,
+      settings: initialSettings,
+    });
     this.vaultFacade = new VaultFacade(vault, getTasksApi);
     this.transactionWriter = new TransactionWriter(this.vaultFacade);
     this.undoNotice = new UndoNotice(this.transactionWriter.undo);
@@ -103,6 +134,7 @@ export default class DayPlanner extends Plugin {
       this.periodicNotes,
     );
     this.metadataCacheFacade = new MetadataCacheFacade(metadataCache);
+    this.searchService = new VaultSearchService(vault, metadataCache);
 
     const icalParseScheduler =
       createBackgroundBatchScheduler<IcalParseTaskResult>({
@@ -118,6 +150,7 @@ export default class DayPlanner extends Plugin {
       pointerDateTime,
     } = createReactor({
       listPropsParser,
+      indexServices,
       vault,
       metadataCache,
       periodicNotes: this.periodicNotes,
@@ -127,12 +160,18 @@ export default class DayPlanner extends Plugin {
 
     const { dispatch } = store;
 
-    this.taskEntryEditor = new ListItemEntryEditor(
-      this.workspaceFacade,
-      this.vaultFacade,
-      this.metadataCacheFacade,
-      listPropsParser,
+    this.searchOrderingService = new DefaultSearchOrderingService(
+      vault,
+      store.getState,
     );
+
+    const yamlEditTargets = createYamlEditTargets({
+      vaultFacade: this.vaultFacade,
+      metadataCacheFacade: this.metadataCacheFacade,
+      listPropsParser,
+      workspaceFacade: this.workspaceFacade,
+    });
+    this.logEntryEditor = new LogEntryEditor(yamlEditTargets);
 
     this.register(() => {
       listenerMiddleware.clearListeners();
@@ -150,7 +189,7 @@ export default class DayPlanner extends Plugin {
     });
 
     const handleEditorMenu = createEditorMenuCallback({
-      taskEntryEditor: this.taskEntryEditor,
+      logEntryEditor: this.logEntryEditor,
       metadataCacheFacade: this.metadataCacheFacade,
       metadataCache,
       listPropsParser,
@@ -355,21 +394,30 @@ export default class DayPlanner extends Plugin {
       id: "clock-in",
       icon: "play",
       name: "Clock in",
-      editorCallback: () => this.taskEntryEditor.clockInUnderCursor(),
+      editorCallback: () =>
+        runWithNoticeOnError(this.logEntryEditor.clockInUnderCursor()),
     });
 
     this.addCommand({
       icon: "square",
       id: "clock-out",
       name: "Clock out",
-      editorCallback: () => this.taskEntryEditor.clockOutUnderCursor(),
+      editorCallback: () =>
+        runWithNoticeOnError(this.logEntryEditor.clockOutUnderCursor()),
     });
 
     this.addCommand({
       icon: "trash-2",
       id: "cancel-clock",
       name: "Cancel clock",
-      editorCallback: () => this.taskEntryEditor.cancelClockUnderCursor(),
+      editorCallback: () =>
+        runWithNoticeOnError(this.logEntryEditor.cancelClockUnderCursor()),
+    });
+
+    this.addCommand({
+      id: "clock-in-on-anything",
+      name: "Clock in on anything...",
+      callback: this.openClockInOnAnythingModal,
     });
   }
 
@@ -411,8 +459,8 @@ export default class DayPlanner extends Plugin {
     store: AppStore;
     dispatch: AppDispatch;
     useSelector: UseSelector<RootState>;
-    remoteTasks: Readable<RemoteTask[]>;
-    localTasks: Readable<LocalTask[]>;
+    remoteTasks: Readable<RemoteTimeBlock[]>;
+    localTasks: Readable<EditableTimeBlock[]>;
     pointerDateTime: Writable<PointerDateTime>;
   }) {
     const {
@@ -498,10 +546,20 @@ export default class DayPlanner extends Plugin {
       }),
     );
 
+    const openEditTimeEntryModal = createEditTimeEntryModalCreator(
+      this.app,
+      this.logEntryEditor,
+    );
+
     const destroyStatusBarWidget = mountStatusBarWidget({
       plugin: this,
       dateRanges,
       tasksWithTimeForToday,
+      useSelector,
+      logEntryEditor: this.logEntryEditor,
+      workspaceFacade: this.workspaceFacade,
+      openEditTimeEntryModal,
+      openClockInOnAnythingModal: this.openClockInOnAnythingModal,
     });
 
     this.register(destroyStatusBarWidget);
@@ -522,7 +580,7 @@ export default class DayPlanner extends Plugin {
     this.addCommand({
       id: "jump-to-active-clock",
       name: "Jump to active clock",
-      callback: () => {
+      callback: async () => {
         const currentTasksWithActiveClockProps = selectActiveLogEntries(
           store.getState(),
         );
@@ -538,14 +596,7 @@ export default class DayPlanner extends Plugin {
 
         isNotVoid(firstTaskWithActiveClockProp);
 
-        const { location } = firstTaskWithActiveClockProp;
-
-        isNotVoid(location);
-
-        this.workspaceFacade.revealLineInFile(
-          location.path,
-          location.position?.start?.line,
-        );
+        await this.workspaceFacade.revealLocation(firstTaskWithActiveClockProp);
       },
     });
 
@@ -563,6 +614,13 @@ export default class DayPlanner extends Plugin {
       onConfirmed: this.undoNotice.show,
     });
 
+    const deleteTask = createDeleteTaskHandler({
+      settings: this.settings,
+      periodicNotes: this.periodicNotes,
+      transactionWriter: this.transactionWriter,
+      onConfirmed: this.undoNotice.show,
+    });
+
     // todo: clean up
     const editText: ObsidianContext["editText"] = ({
       initialText,
@@ -574,17 +632,14 @@ export default class DayPlanner extends Plugin {
         getDescriptionText,
       });
 
-    const openEditTimeEntryModal = createEditTimeEntryModalCreator(
-      this.app,
-      this.taskEntryEditor,
-    );
-
     const defaultObsidianContext: ObsidianContext = {
       periodicNotes: this.periodicNotes,
       openEditTimeEntryModal,
-      taskEntryEditor: this.taskEntryEditor,
+      openClockInOnAnythingModal: this.openClockInOnAnythingModal,
+      logEntryEditor: this.logEntryEditor,
       editText,
       editLine,
+      deleteTask,
       workspaceFacade: this.workspaceFacade,
       initWeeklyView: this.initWeeklyLeaf,
       renderMarkdown: createRenderMarkdown(this.app),

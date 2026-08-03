@@ -1,41 +1,25 @@
 import { Menu } from "obsidian";
-import { isNotVoid } from "typed-assert";
 
-import {
-  runWithNoticeOnError,
-  type ListItemEntryEditor,
-} from "../service/list-item-entry-editor";
+import type { LogEntryEditor } from "../service/log-entry-editor";
 import type { WorkspaceFacade } from "../service/workspace-facade";
-import type { LocalTask } from "../task-types";
+import type { LogTimeBlock } from "../time-block-types";
+import { runWithNoticeOnError } from "../util/effect";
 
 export function createRecentClockMenu(props: {
   event: PointerEvent | MouseEvent | TouchEvent;
-  task: LocalTask;
-  taskEntryEditor: ListItemEntryEditor;
+  task: LogTimeBlock;
+  logEntryEditor: LogEntryEditor;
   workspaceFacade: WorkspaceFacade;
 }) {
-  const { event, task, taskEntryEditor, workspaceFacade } = props;
+  const { event, task, logEntryEditor, workspaceFacade } = props;
   const menu = new Menu();
-  const { location } = task;
-
-  // todo: remove when types are fixed
-  isNotVoid(location);
-
-  const {
-    path,
-    position: {
-      start: { line },
-    },
-  } = location;
 
   menu.addItem((item) => {
     item
       .setTitle("Clock in")
       .setIcon("play")
       .onClick(async () => {
-        await runWithNoticeOnError(
-          taskEntryEditor.clockInAtLocation({ path, line }),
-        );
+        await runWithNoticeOnError(logEntryEditor.clockIn(task));
       });
   });
 
@@ -44,7 +28,7 @@ export function createRecentClockMenu(props: {
       .setTitle("Reveal task in file")
       .setIcon("file-input")
       .onClick(async () => {
-        await workspaceFacade.revealLineInFile(path, line);
+        await workspaceFacade.revealLocation(task);
       });
   });
 

@@ -20,17 +20,19 @@
 <style>
   .column {
     position: relative;
-
     flex: 1 0 var(--timeline-flex-basis);
-
-    height: fit-content;
-
     background-color: var(--column-background-color, var(--background-primary));
-    border-right: var(--border-base);
+  }
+
+  .column:not(:last-child) {
+    border-right: 1px dashed var(--background-modifier-border);
   }
 
   .hour-block {
     flex: 1 0 0;
+  }
+
+  .hour-block:not(:last-child) {
     border-bottom: var(--border-base);
   }
 

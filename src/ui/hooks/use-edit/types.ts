@@ -1,4 +1,7 @@
-import type { LocalTask, WithTime } from "../../../task-types";
+import type {
+  EditableTimeBlock,
+  WithDuration,
+} from "../../../time-block-types";
 
 export enum EditMode {
   DRAG = "DRAG",
@@ -14,6 +17,6 @@ export enum EditMode {
 }
 
 export interface EditOperation {
-  task: WithTime<LocalTask>;
+  task: WithDuration<EditableTimeBlock>;
   mode: EditMode;
 }

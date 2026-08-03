@@ -1,27 +1,23 @@
 import { Menu } from "obsidian";
-import { isNotVoid } from "typed-assert";
 
 import type { WorkspaceFacade } from "../service/workspace-facade";
-import { type LocalTask } from "../task-types";
+import {
+  type EditableTimeBlock,
+  type PlanTimeBlock,
+} from "../time-block-types";
 
 export function createTimeBlockMenu(props: {
   event: MouseEvent | TouchEvent;
-  task: LocalTask;
+  task: EditableTimeBlock;
   workspaceFacade: WorkspaceFacade;
   onEdit: () => void;
+  onDelete: (task: PlanTimeBlock) => Promise<void>;
 }) {
-  const { event, task, workspaceFacade, onEdit } = props;
-  const { location } = task;
+  const { event, task, workspaceFacade, onEdit, onDelete } = props;
 
-  // todo: remove when types are fixed
-  isNotVoid(location);
-
-  const {
-    path,
-    position: {
-      start: { line },
-    },
-  } = location;
+  if (task.source === "unwritten") {
+    throw new Error("Cannot show a menu for an unwritten time block");
+  }
 
   const menu = new Menu();
 
@@ -34,7 +30,19 @@ export function createTimeBlockMenu(props: {
       .setTitle("Reveal task in file")
       .setIcon("file-input")
       .onClick(async () => {
-        await workspaceFacade.revealLineInFile(path, line);
+        await workspaceFacade.revealLocation(task);
+      });
+  });
+
+  menu.addSeparator();
+
+  menu.addItem((item) => {
+    item
+      .setTitle("Delete")
+      .setIcon("trash-2")
+      .setWarning(true)
+      .onClick(async () => {
+        await onDelete(task);
       });
   });
 

@@ -1,53 +1,39 @@
 import { Menu } from "obsidian";
-import { isNotVoid } from "typed-assert";
 
-import {
-  runWithNoticeOnError,
-  type ListItemEntryEditor,
-} from "../service/list-item-entry-editor";
+import type { LogEntryEditor } from "../service/log-entry-editor";
 import type { WorkspaceFacade } from "../service/workspace-facade";
-import type { LocalTask } from "../task-types";
+import type { LogTimeBlock } from "../time-block-types";
+import { runWithNoticeOnError } from "../util/effect";
 
 import type { OpenEditTimeEntryModal } from "./create-edit-time-entry-modal";
 
 export function createActiveClockMenu(props: {
   event: PointerEvent | MouseEvent | TouchEvent;
-  task: LocalTask;
-  // todo: lift to main.ts
-  taskEntryEditor: ListItemEntryEditor;
+  task: LogTimeBlock;
+  logEntryEditor: LogEntryEditor;
   workspaceFacade: WorkspaceFacade;
   openEditTimeEntryModal: OpenEditTimeEntryModal;
 }) {
   const {
     event,
     task,
-    taskEntryEditor,
+    logEntryEditor,
     workspaceFacade,
     openEditTimeEntryModal,
   } = props;
 
   const menu = new Menu();
-  const { location } = task;
-
-  // todo: remove when types are fixed
-  isNotVoid(location);
-
-  const {
-    path,
-    position: {
-      start: { line },
-    },
-  } = location;
 
   menu.addItem((item) => {
-    return item
-      .setTitle("Clock out")
-      .setIcon("square")
-      .onClick(async () => {
-        await runWithNoticeOnError(
-          taskEntryEditor.clockOutAtLocation({ path, line }),
-        );
-      });
+    return (
+      item
+        .setTitle("Clock out")
+        .setIcon("square")
+        // todo: code started drifting: pass onClockOut and so on
+        .onClick(async () => {
+          await runWithNoticeOnError(logEntryEditor.clockOut(task));
+        })
+    );
   });
 
   menu.addItem((item) =>
@@ -62,7 +48,7 @@ export function createActiveClockMenu(props: {
       .setTitle("Reveal task in file")
       .setIcon("file-input")
       .onClick(async () => {
-        await workspaceFacade.revealLineInFile(path, line);
+        await workspaceFacade.revealLocation(task);
       });
   });
 
@@ -74,9 +60,7 @@ export function createActiveClockMenu(props: {
       .setIcon("trash-2")
       .setWarning(true)
       .onClick(async () => {
-        await runWithNoticeOnError(
-          taskEntryEditor.cancelClockAtLocation({ path, line }),
-        );
+        await runWithNoticeOnError(logEntryEditor.cancelClock(task));
       });
   });
 

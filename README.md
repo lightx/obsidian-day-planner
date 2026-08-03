@@ -1,10 +1,25 @@
-- 🗳️ [Add '👍' reactions under the issues important to you.](https://github.com/ivan-lednev/obsidian-day-planner/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) This helps me prioritize my work
-- 🪲 [Report bugs and suggest features](https://github.com/ivan-lednev/obsidian-day-planner/issues)
-- ❓ [Ask questions](https://github.com/ivan-lednev/obsidian-day-planner/discussions/new?category=q-a)
-- 🛠️ [Submit pull-requests](./CONTRIBUTING.md)
-- ❤️ If this project adds value to your life, consider supporting it finantially:
-  - <a href="https://www.buymeacoffee.com/machineelf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; margin: 20px;">
+  <div style="font-size: 0.9em;">
+    <a href="https://github.com/ivan-lednev/obsidian-day-planner/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc">Vote on issues</a>
+    · <a href="https://github.com/ivan-lednev/obsidian-day-planner/issues">Report a bug or suggest a feature</a>
+    · <a href="https://github.com/ivan-lednev/obsidian-day-planner/discussions/new?category=q-a">Ask a question</a>
+    · <a href="./CONTRIBUTING.md">Contribute code</a>
+  </div>
 
+  <div>Day Planner is free for everyone. If it helps you plan your days, please consider supporting its development.</div>
+
+  <a href="https://www.buymeacoffee.com/machineelf">
+    <img
+      src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+      alt="Buy Me A Coffee"
+      style="height: 60px !important; width: 217px !important;"
+    >
+  </a>
+
+</div>
+
+<img src="./assets/hero-daily.png" width="100%">
+<img src="./assets/hero-weekly.png" width="100%">
 
 Day Planner is a community plugin for [Obsidian](https://obsidian.md/). It adds editable calendar views and basic time-tracking. Day Planner is integrated with
 
@@ -149,6 +164,11 @@ You can enable an additional timeline column to see the recorded clocks next to 
 
 <img src="./assets/show-time-tracker-settings.png" width="75%">
 
+Right click (or tap and hold on mobile) a clock block to open its control menu:
+
+- An active clock can be clocked out, edited or canceled
+- A completed clock can be resumed, edited or deleted
+
 #### Active clocks
 
 You can see the currently active clocks in the timeline sidebar:
@@ -161,7 +181,7 @@ A right click on an active clock will bring the control menu:
 
 #### Limitations
 
-- For now clock time blocks are read-only. This is going to be addressed in the future.
+- Clock time blocks cannot be edited by dragging yet. Use the context menu to edit clock times.
 
 ## Note on the old plugin version
 

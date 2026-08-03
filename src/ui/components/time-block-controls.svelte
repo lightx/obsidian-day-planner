@@ -1,10 +1,9 @@
 <script lang="ts">
   import { type Snippet } from "svelte";
-  import { isNotVoid } from "typed-assert";
 
   import { getObsidianContext } from "../../context/obsidian-context";
   import { timeRangeAtStartOfLineRegExp } from "../../regexp";
-  import { type LocalTask } from "../../task-types";
+  import { type EditableTimeBlock } from "../../time-block-types";
   import { createMarkdownListTokens, getFirstLine } from "../../util/markdown";
   import { createTimestamp } from "../../util/task-utils";
   import { getMinutesSinceMidnight } from "../../util/moment";
@@ -26,7 +25,7 @@
     task,
     timeBlock,
   }: {
-    task: LocalTask;
+    task: EditableTimeBlock;
     class?: string;
     timeBlock: Snippet<[TimeBlockProps]>;
   } = $props();
@@ -36,10 +35,13 @@
     workspaceFacade,
     editText,
     editLine,
+    deleteTask,
   } = getObsidianContext();
 
   async function editTaskSummary() {
-    isNotVoid(task.location);
+    if (task.source === "unwritten") {
+      throw new Error("Cannot edit the summary of an unwritten time block");
+    }
 
     if (task.isBoldTimeEntry) {
       // Bold-time format: **HH:MM** text
@@ -95,8 +97,8 @@
     const lineStart = firstLine.slice(0, timestampEnd) + leadingSpace;
 
     await editLine({
-      path: task.location.path,
-      position: task.location.position.start,
+      path: task.path,
+      position: task.position.start,
       contents: `${createMarkdownListTokens(task)} ${lineStart}${next}`,
     });
   }
@@ -109,6 +111,7 @@
       task,
       workspaceFacade,
       onEdit: editTaskSummary,
+      onDelete: deleteTask,
     })}
   selectionBlocked={Boolean($editOperation)}
 >

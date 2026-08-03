@@ -6,6 +6,7 @@
   import { getObsidianContext } from "../../context/obsidian-context";
   import { isToday } from "../../global-store/current-time";
   import { settings } from "../../global-store/settings";
+  import { createColumnSelectionMenu } from "../column-selection-menu";
 
   import ControlButton from "./control-button.svelte";
   import {
@@ -21,6 +22,8 @@
   const dateRange = getDateRangeContext();
 
   let settingsVisible = $state(false);
+
+  const { timeTracker, planner } = $derived($settings.timelineColumns);
 
   function toggleSettings() {
     settingsVisible = !settingsVisible;
@@ -90,26 +93,42 @@
       <ControlButton label="Go to next day" onclick={goForward}>
         <ChevronRight />
       </ControlButton>
+      <ControlButton
+        label="Go to file"
+        onclick={async () => {
+          const note = await periodicNotes.createDailyNoteIfNeeded(
+            $dateRange[0],
+          );
+
+          await workspaceFacade.openFileInEditor(note);
+        }}
+      >
+        <span class="date">
+          {#if $isToday($dateRange[0])}
+            🔵
+          {/if}
+
+          {$dateRange[0].format($settings.timelineDateFormat)}</span
+        >
+      </ControlButton>
     </div>
 
-    <ControlButton
-      label="Go to file"
-      onclick={async () => {
-        const note = await periodicNotes.createDailyNoteIfNeeded($dateRange[0]);
-
-        await workspaceFacade.openFileInEditor(note);
-      }}
-    >
-      <span class="date">
-        {#if $isToday($dateRange[0])}
-          🔵
-        {/if}
-
-        {$dateRange[0].format($settings.timelineDateFormat)}</span
-      >
-    </ControlButton>
-
     <div class="buttons-right">
+      <ControlButton
+        class="control-text"
+        label="Select visible columns"
+        onclick={(event) => {
+          createColumnSelectionMenu({ settings, event });
+        }}
+      >
+        {#if planner && timeTracker}
+          Planner | Tracker
+        {:else if planner}
+          Planner
+        {:else if timeTracker}
+          Tracker
+        {/if}
+      </ControlButton>
       <ControlButton onclick={handleReSyncClick}>
         <EllipsisVertical class="svg-icon" />
       </ControlButton>
@@ -163,7 +182,7 @@
 
   .header {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: 1fr 1fr;
     padding-right: var(--size-4-3);
   }
 
@@ -191,5 +210,14 @@
 
   .settings-wrapper > :global(*) {
     padding-right: var(--size-4-1);
+  }
+
+  .controls :global(.control-text) {
+    font-size: var(--font-ui-small);
+    color: var(--text-faint);
+  }
+
+  .controls :global(.control-text:hover) {
+    color: var(--text-muted);
   }
 </style>
