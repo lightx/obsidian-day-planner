@@ -4,7 +4,7 @@
   import { statusBarTextLimit } from "../../constants";
   import { currentTimeSignal } from "../../global-store/current-time";
   import { settingsSignal } from "../../global-store/settings";
-  import { selectActiveLogEntries } from "../../redux/index/index-slice";
+  import { selectNewestActiveLogTimeBlock } from "../../redux/index/index-selectors";
   import type { RootState } from "../../redux/store";
   import type { UseSelector } from "../../redux/use-selector";
   import type { LogEntryEditor } from "../../service/log-entry-editor";
@@ -14,32 +14,32 @@
   import { fromDiff } from "../../util/moment";
   import { getOneLineSummary } from "../../util/time-block-utils";
   import { createActiveClockMenu } from "../active-clock-menu";
-  import type { OpenEditTimeEntryModal } from "../create-edit-time-entry-modal";
   import { useStatusBarWidget } from "../hooks/use-status-bar-widget";
+  import type { OpenLogEntryEditModal } from "../log-entry-edit-modal";
 
   import { SkipForward, Play, Timer } from "./lucide";
   import MiniTimeline from "./mini-timeline.svelte";
 
   const {
     onClick,
-    tasksWithTimeForToday,
+    timeBlocksWithTimeForToday,
     useSelector,
     logEntryEditor,
     workspaceFacade,
-    openEditTimeEntryModal,
+    openLogEntryEditModal,
     openClockInOnAnythingModal,
   }: {
     onClick: () => Promise<void>;
-    tasksWithTimeForToday: Readable<Array<WithDuration<TimeBlock>>>;
+    timeBlocksWithTimeForToday: Readable<Array<WithDuration<TimeBlock>>>;
     useSelector: UseSelector<RootState>;
     logEntryEditor: LogEntryEditor;
     workspaceFacade: WorkspaceFacade;
-    openEditTimeEntryModal: OpenEditTimeEntryModal;
+    openLogEntryEditModal: OpenLogEntryEditModal;
     openClockInOnAnythingModal: () => void;
   } = $props();
 
   const { current, next } = $derived(
-    fromStore(useStatusBarWidget({ tasksWithTimeForToday })).current,
+    fromStore(useStatusBarWidget({ timeBlocksWithTimeForToday })).current,
   );
 
   const {
@@ -50,13 +50,13 @@
     showActiveClockInStatusBar,
   } = $derived(settingsSignal.current);
 
-  const activeLogRecords = $derived(useSelector(selectActiveLogEntries));
-
-  const newestActiveClock = $derived(
-    activeLogRecords.current
-      .toSorted((a, b) => b.startTime.diff(a.startTime))
-      .at(0),
+  const newestActiveClockSignal = $derived(
+    useSelector((state) =>
+      selectNewestActiveLogTimeBlock(state, currentTimeSignal.current),
+    ),
   );
+
+  const newestActiveClock = $derived(newestActiveClockSignal.current);
 
   function handleClockClick(event: MouseEvent) {
     if (!newestActiveClock) {
@@ -67,10 +67,10 @@
 
     createActiveClockMenu({
       event,
-      task: newestActiveClock,
+      timeBlock: newestActiveClock,
       logEntryEditor,
       workspaceFacade,
-      openEditTimeEntryModal,
+      openLogEntryEditModal,
     });
   }
 </script>
@@ -143,7 +143,7 @@
 
 {#if progressIndicator === "mini-timeline"}
   <div class="status-bar-item mini-timeline">
-    <MiniTimeline {tasksWithTimeForToday} />
+    <MiniTimeline {timeBlocksWithTimeForToday} />
   </div>
 {/if}
 

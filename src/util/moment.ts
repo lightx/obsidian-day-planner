@@ -14,6 +14,10 @@ export function getMinutesSinceMidnight(moment: Moment) {
   return moment.diff(moment.clone().startOf("day"), "minutes");
 }
 
+export function toMinutePrecision(moment: Moment) {
+  return moment.clone().startOf("minute");
+}
+
 export function toMinutes(time: string) {
   const parsed = moment(time, defaultTimestampFormat);
 
@@ -28,7 +32,7 @@ export function getMomentFromDayOfWeek(
   startingDay: Moment,
   firstDayOFWeek: DayPlannerSettings["firstDayOfWeek"],
 ) {
-  const startOfIsoWeek = startingDay.startOf("isoWeek");
+  const startOfIsoWeek = startingDay.clone().startOf("isoWeek");
   const subtractDays: Record<DayPlannerSettings["firstDayOfWeek"], number> = {
     monday: 0,
     sunday: 1,
@@ -162,4 +166,10 @@ export function strictParse(value: string) {
   // Fallback: Obsidian's bundled moment may reject the space separator in strict
   // ISO 8601 mode even though it's technically valid. Parse with explicit format.
   return window.moment(value, "YYYY-MM-DD HH:mm:ss", true);
+}
+
+export function minutesToTimestamp(minutes: number) {
+  return window.moment
+    .utc(window.moment.duration(minutes, "minutes").asMilliseconds())
+    .format("HH:mm");
 }

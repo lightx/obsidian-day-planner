@@ -13,7 +13,7 @@ import {
 test("roundtripping doesn't mess up Obsidian-styled markdown", () => {
   const input = `# [[Heading]]
 
-- [!] This is ![[custom syntax]] all #over the place ^block-id
+- [!] This is ![[custom_syntax]] all #over the place ^block-id
   \`\`\`js
   console.log("this is a code block");
   \`\`\`
@@ -95,6 +95,7 @@ test("Sort lists recursively", () => {
   const tree = fromMarkdown(input);
   const list = tree.children[0];
 
+  isNotVoid(list);
   isList(list);
 
   const actual = toMarkdown(sortListsRecursively(list));
@@ -120,6 +121,7 @@ test("Sort lists by time", () => {
   const tree = fromMarkdown(input);
   const list = tree.children[0];
 
+  isNotVoid(list);
   isList(list);
 
   const actual = toMarkdown(
@@ -140,6 +142,7 @@ test("Does not throw errors on empty lists", () => {
   const tree = fromMarkdown(input);
   const list = tree.children[0];
 
+  isNotVoid(list);
   isList(list);
 
   expect(() => toMarkdown(sortListsRecursively(list))).not.toThrow();

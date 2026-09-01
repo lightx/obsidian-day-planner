@@ -1,5 +1,5 @@
 import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
-import { fromStore, get, type Readable, type Writable } from "svelte/store";
+import { get, type Readable, type Writable } from "svelte/store";
 import { isNotVoid } from "typed-assert";
 
 import {
@@ -12,7 +12,7 @@ import {
   icalParseLowerLimit,
 } from "./constants";
 import {
-  createDeleteTaskHandler,
+  createDeleteTimeBlockHandler,
   createEditLineHandler,
   createUpdateHandler,
   getTextFromUser,
@@ -20,7 +20,7 @@ import {
 import { createDumpMetadataCommand } from "./dump-metadata";
 import { VaultIndexAdapter } from "./feature/vault-index-adapter";
 import { currentTime } from "./global-store/current-time";
-import { settings } from "./global-store/settings";
+import { settingsSignal, settingsStore } from "./global-store/settings";
 import {
   compareByTimestampInText,
   fromMarkdown,
@@ -30,10 +30,10 @@ import {
   toMarkdown,
   toMdastPoint,
 } from "./mdast/mdast";
-import { visibleDaysUpdated } from "./redux/global-slice";
+import type { DateRanges } from "./redux/date-ranges";
 import { icalRefreshRequested } from "./redux/ical/ical-slice";
 import { type IcalParseTaskResult } from "./redux/ical/init-ical-listeners";
-import { selectActiveLogEntries } from "./redux/index/index-slice";
+import { selectActiveLogTimeBlocks } from "./redux/index/index-selectors";
 import { settingsUpdated } from "./redux/settings-slice";
 import {
   type AppDispatch,
@@ -65,27 +65,26 @@ import type { EditableTimeBlock, RemoteTimeBlock } from "./time-block-types";
 import type { ObsidianContext, OnUpdateFn, PointerDateTime } from "./types";
 import { ClockInOnAnythingModal } from "./ui/clock-in-on-anything-modal";
 import { askForConfirmation } from "./ui/confirmation-modal";
-import { createEditTimeEntryModalCreator } from "./ui/create-edit-time-entry-modal";
 import { createEditorMenuCallback } from "./ui/editor-menu";
-import { useDateRanges } from "./ui/hooks/use-date-ranges";
-import { mountStatusBarWidget } from "./ui/hooks/use-status-bar-widget";
-import { useTasks } from "./ui/hooks/use-tasks";
-import { useVisibleDays } from "./ui/hooks/use-visible-days";
+import { useTimeBlocks } from "./ui/hooks/use-time-blocks";
+import { createLogEntryEditModalOpener } from "./ui/log-entry-edit-modal";
 import MultiDayView from "./ui/multi-day-view";
 import { DayPlannerReleaseNotesView } from "./ui/release-notes";
 import { DayPlannerSettingsTab } from "./ui/settings-tab";
+import { mountStatusBarWidget } from "./ui/status-bar-widget";
 import TimeTrackerView from "./ui/time-tracker-view";
+import { createTimelineSettingsModalOpener } from "./ui/timeline-settings-modal";
 import TimelineView from "./ui/timeline-view";
 import { UndoNotice } from "./ui/undo-notice";
 import { createEnvironmentHooks } from "./util/create-environment-hooks";
 import { createRenderMarkdown } from "./util/create-render-markdown";
 import { createShowPreview } from "./util/create-show-preview";
 import { runWithNoticeOnError } from "./util/effect";
-import { notifyAboutStartedTasks } from "./util/notify-about-started-tasks";
+import { notifyAboutStartedTimeBlocks } from "./util/notify-about-started-time-blocks";
 import { createBackgroundBatchScheduler } from "./util/scheduler";
 
 export default class DayPlanner extends Plugin {
-  settings!: () => DayPlannerSettings;
+  getSettings!: () => DayPlannerSettings;
   private settingsStore!: Writable<DayPlannerSettings>;
   private workspaceFacade!: WorkspaceFacade;
   private periodicNotes!: PeriodicNotes;
@@ -145,9 +144,10 @@ export default class DayPlanner extends Plugin {
       store,
       useSelector,
       listenerMiddleware,
-      remoteTasks,
-      localTasks,
+      remoteTimeBlocks,
+      localTimeBlocks,
       pointerDateTime,
+      dateRanges,
     } = createReactor({
       listPropsParser,
       indexServices,
@@ -182,10 +182,11 @@ export default class DayPlanner extends Plugin {
     this.registerViews({
       store,
       dispatch,
-      remoteTasks,
+      remoteTimeBlocks,
       pointerDateTime,
       useSelector,
-      localTasks,
+      localTimeBlocks,
+      dateRanges,
     });
 
     const handleEditorMenu = createEditorMenuCallback({
@@ -292,7 +293,7 @@ export default class DayPlanner extends Plugin {
     this.initRightPanelLeaf(viewTypeTimeTracker);
 
   private async handleNewPluginVersion() {
-    if (this.settings().pluginVersion === currentPluginVersion) {
+    if (this.getSettings().pluginVersion === currentPluginVersion) {
       return;
     }
 
@@ -301,7 +302,7 @@ export default class DayPlanner extends Plugin {
       pluginVersion: currentPluginVersion,
     }));
 
-    if (this.settings().releaseNotes) {
+    if (this.getSettings().releaseNotes) {
       this.app.workspace.onLayoutReady(async () => {
         await this.showReleaseNotes();
       });
@@ -427,18 +428,18 @@ export default class DayPlanner extends Plugin {
   }) {
     const { initialSettings, dispatch } = props;
 
-    settings.set(initialSettings);
+    settingsStore.set(initialSettings);
 
     this.register(
-      settings.subscribe(async (newValue) => {
+      settingsStore.subscribe(async (newValue) => {
         dispatch(settingsUpdated(newValue));
 
         await this.saveData(newValue);
       }),
     );
 
-    this.settingsStore = settings;
-    this.settings = () => get(settings);
+    this.settingsStore = settingsStore;
+    this.getSettings = () => get(settingsStore);
   }
 
   private async detachLeavesOfType(type: string) {
@@ -459,21 +460,23 @@ export default class DayPlanner extends Plugin {
     store: AppStore;
     dispatch: AppDispatch;
     useSelector: UseSelector<RootState>;
-    remoteTasks: Readable<RemoteTimeBlock[]>;
-    localTasks: Readable<EditableTimeBlock[]>;
+    remoteTimeBlocks: Readable<RemoteTimeBlock[]>;
+    localTimeBlocks: Readable<EditableTimeBlock[]>;
     pointerDateTime: Writable<PointerDateTime>;
+    dateRanges: DateRanges;
   }) {
     const {
       store,
       dispatch,
       useSelector,
-      remoteTasks,
-      localTasks,
+      remoteTimeBlocks,
+      localTimeBlocks,
       pointerDateTime,
+      dateRanges,
     } = props;
 
     const onUpdate: OnUpdateFn = createUpdateHandler({
-      settings: this.settings,
+      getSettings: this.getSettings,
       transactionWriter: this.transactionWriter,
       vaultFacade: this.vaultFacade,
       periodicNotes: this.periodicNotes,
@@ -504,21 +507,19 @@ export default class DayPlanner extends Plugin {
       workspace: this.app.workspace,
     });
 
-    const dateRanges = useDateRanges();
-    const visibleDays = useVisibleDays(dateRanges.ranges);
-
-    const { tasksWithTimeForToday, editContext, newlyStartedTasks } = useTasks({
-      onUpdate,
-      onEditAborted,
-      periodicNotes: this.periodicNotes,
-      workspaceFacade: this.workspaceFacade,
-      isOnline,
-      settingsStore: this.settingsStore,
-      currentTime,
-      pointerDateTime,
-      remoteTasks,
-      localTasks,
-    });
+    const { timeBlocksWithTimeForToday, editContext, newlyStartedTimeBlocks } =
+      useTimeBlocks({
+        onUpdate,
+        onEditAborted,
+        periodicNotes: this.periodicNotes,
+        workspaceFacade: this.workspaceFacade,
+        isOnline,
+        settingsStore: this.settingsStore,
+        currentTime,
+        pointerDateTime,
+        remoteTimeBlocks,
+        localTimeBlocks,
+      });
 
     this.registerInterval(
       window.setInterval(() => {
@@ -536,37 +537,32 @@ export default class DayPlanner extends Plugin {
         document.body.style.cursor = bodyCursor;
       }),
     );
-    this.register(
-      visibleDays.subscribe((days) => {
-        dispatch(
-          // without the offset, an event right of UTC is going to be displayed as the previous day
-          // a visible day in my zone is 2025-04-15, but in UTC it's 2025-04-14T22:00:00, and getDayKey returns 2025-04-14
-          visibleDaysUpdated(days.map((it) => it.toISOString(true))),
-        );
-      }),
-    );
-
-    const openEditTimeEntryModal = createEditTimeEntryModalCreator(
+    const openLogEntryEditModal = createLogEntryEditModalOpener(
       this.app,
       this.logEntryEditor,
+    );
+
+    const openTimelineSettingsModal = createTimelineSettingsModalOpener(
+      this.app,
+      settingsStore,
     );
 
     const destroyStatusBarWidget = mountStatusBarWidget({
       plugin: this,
       dateRanges,
-      tasksWithTimeForToday,
+      timeBlocksWithTimeForToday,
       useSelector,
       logEntryEditor: this.logEntryEditor,
       workspaceFacade: this.workspaceFacade,
-      openEditTimeEntryModal,
+      openLogEntryEditModal,
       openClockInOnAnythingModal: this.openClockInOnAnythingModal,
     });
 
     this.register(destroyStatusBarWidget);
 
     this.register(
-      newlyStartedTasks.subscribe((value) =>
-        notifyAboutStartedTasks(value, this.settings()),
+      newlyStartedTimeBlocks.subscribe((value) =>
+        notifyAboutStartedTimeBlocks(value, this.getSettings()),
       ),
     );
     this.addCommand({
@@ -581,22 +577,22 @@ export default class DayPlanner extends Plugin {
       id: "jump-to-active-clock",
       name: "Jump to active clock",
       callback: async () => {
-        const currentTasksWithActiveClockProps = selectActiveLogEntries(
+        const activeLogTimeBlocks = selectActiveLogTimeBlocks(
           store.getState(),
+          window.moment(),
         );
 
-        if (currentTasksWithActiveClockProps.length === 0) {
+        if (activeLogTimeBlocks.length === 0) {
           new Notice("No active clocks found");
 
           return;
         }
 
-        const firstTaskWithActiveClockProp =
-          currentTasksWithActiveClockProps[0];
+        const firstActiveLogTimeBlock = activeLogTimeBlocks[0];
 
-        isNotVoid(firstTaskWithActiveClockProp);
+        isNotVoid(firstActiveLogTimeBlock);
 
-        await this.workspaceFacade.revealLocation(firstTaskWithActiveClockProp);
+        await this.workspaceFacade.revealLocation(firstActiveLogTimeBlock);
       },
     });
 
@@ -609,13 +605,13 @@ export default class DayPlanner extends Plugin {
     }
 
     const editLine = createEditLineHandler({
-      settings: this.settings,
+      getSettings: this.getSettings,
       transactionWriter: this.transactionWriter,
       onConfirmed: this.undoNotice.show,
     });
 
-    const deleteTask = createDeleteTaskHandler({
-      settings: this.settings,
+    const deleteTimeBlock = createDeleteTimeBlockHandler({
+      getSettings: this.getSettings,
       periodicNotes: this.periodicNotes,
       transactionWriter: this.transactionWriter,
       onConfirmed: this.undoNotice.show,
@@ -632,14 +628,17 @@ export default class DayPlanner extends Plugin {
         getDescriptionText,
       });
 
+    const reSync = () => dispatch(icalRefreshRequested());
+
     const defaultObsidianContext: ObsidianContext = {
       periodicNotes: this.periodicNotes,
-      openEditTimeEntryModal,
+      openLogEntryEditModal,
+      openTimelineSettingsModal,
       openClockInOnAnythingModal: this.openClockInOnAnythingModal,
       logEntryEditor: this.logEntryEditor,
       editText,
       editLine,
-      deleteTask,
+      deleteTimeBlock,
       workspaceFacade: this.workspaceFacade,
       initWeeklyView: this.initWeeklyLeaf,
       renderMarkdown: createRenderMarkdown(this.app),
@@ -647,11 +646,11 @@ export default class DayPlanner extends Plugin {
       editContext,
       showPreview: createShowPreview(this.app),
       isModPressed,
-      reSync: () => dispatch(icalRefreshRequested()),
+      reSync,
       isOnline,
       isDarkMode,
-      settings,
-      settingsSignal: fromStore(settings),
+      settingsStore,
+      settingsSignal,
       pointerDateTime,
       dispatch,
       useSelector,
@@ -666,10 +665,14 @@ export default class DayPlanner extends Plugin {
       (leaf: WorkspaceLeaf) =>
         new TimelineView(
           leaf,
-          this.settings,
+          this.settingsStore,
           componentContext,
           dateRanges,
           this.periodicNotes,
+          this.workspaceFacade,
+          this.initWeeklyLeaf,
+          reSync,
+          openTimelineSettingsModal,
         ),
     );
 

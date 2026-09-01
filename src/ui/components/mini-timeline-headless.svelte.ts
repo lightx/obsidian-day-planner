@@ -17,7 +17,7 @@ export class MiniTimeline {
 
   constructor(
     private readonly currentTimeSignal: Signal<Moment>,
-    private readonly tasksWithTimeForToday: Signal<
+    private readonly timeBlocksWithTimeForTodaySignal: Signal<
       Array<WithDuration<TimeBlock>>
     >,
   ) {}
@@ -39,7 +39,7 @@ export class MiniTimeline {
 
   displayedBlocks = $derived(
     pipe(
-      this.tasksWithTimeForToday.current,
+      this.timeBlocksWithTimeForTodaySignal.current,
       Array.filter((it) =>
         doesOverlapWithRange(
           { start: it.startTime, end: t.getEndTime(it) },
@@ -50,7 +50,10 @@ export class MiniTimeline {
         ),
       ),
       Array.map((it) => ({
-        ...t.clamp(it, this.rangeStart, this.rangeEnd),
+        ...t.clampToTimeRange(it, {
+          start: this.rangeStart,
+          end: this.rangeEnd,
+        }),
         leftPx: it.startTime.clone().diff(this.rangeStart, `minutes`),
       })),
       addHorizontalPlacing,

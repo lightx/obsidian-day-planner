@@ -1,3 +1,48 @@
+## 0.35.1
+
+### 🐞 Fixed issues
+
+- The active clock block on the timeline no longer lags behind the current time indicator
+- The status bar widget now updates when the day changes
+
+### 🔧 Under the hood
+
+- Internal cleanup: stricter type checks and consistent naming across the codebase
+- Updated the plugin description in the community plugin list
+
+## 0.35.0
+
+### ✨ New features
+
+- Plan blocks can now be clocked in from the timeline: right click (or tap and hold on mobile) a block and select 'Clock in'
+- The timeline takes up less space when opened in a regular tab: the month, the column selector and the '⋮' button are gone from the view itself
+  - All of them moved to the tab menu: right click the tab (or use the '⋮' button in its header) to re-sync internet calendars, open the multi-day planner or the daily note for the selected day, pick visible columns and open the view settings
+  - The tab title now shows the month and the year of the selected day
+
+### 🐞 Fixed issues
+
+- Underscores in links and other Obsidian syntax are no longer escaped with a backslash when a task gets edited
+
+## 0.34.0
+
+### 💥 Breaking changes
+
+- Minimum required Obsidian version is now 1.6.0
+- Removed the 'Show timeline' and 'Show all day events' toggles: the timeline and the all day events row are always shown
+
+### ✨ New features
+
+- Plan blocks can now be deleted from the timeline: right click (or tap and hold on mobile) a block and select 'Delete'. As with other edits, you get an undo notice
+- New timeline header with a week strip: pick any day of the week in one click, jump between weeks with the arrows, or come back with the 'Today' button
+  - Clicking the day that is already selected opens its daily note (and creates it if it doesn't exist yet)
+  - The current day is highlighted with the accent color, days outside the selected month are dimmed
+- View settings moved from the inline panel into a 'Timeline settings' modal: open it from the '⋮' menu → 'View settings'. The modal is shared by the timeline and the multi-day planner, so both views now use all the available width
+- All day events now live in their own compact row above the timeline: it takes up much less space, scrolls on its own when there are many events, and stays in place while you scroll the timeline
+
+### 🐞 Fixed issues
+
+- Column separators, borders and paddings cleaned up across the timeline and the multi-day planner
+
 ## 0.33.0
 
 ### ✨ New features

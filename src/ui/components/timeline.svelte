@@ -6,7 +6,7 @@
   import { getObsidianContext } from "../../context/obsidian-context";
   import { currentTimeSignal, isToday } from "../../global-store/current-time";
   import { getVisibleHours, snap } from "../../global-store/derived-settings";
-  import { selectLogEntriesForDay } from "../../redux";
+  import { selectLogTimeBlocksForDay } from "../../redux";
   import { selectLogEntriesById } from "../../redux/index/index-slice";
   import type { LogTimeBlock } from "../../time-block-types";
   import {
@@ -22,6 +22,7 @@
 
   import Column from "./column.svelte";
   import LocalTimeBlock from "./local-time-block.svelte";
+  import NeedleClockControl from "./needle-clock-control.svelte";
   import Needle from "./needle.svelte";
   import PositionedTimeBlock from "./positioned-time-block.svelte";
   import Selectable from "./selectable.svelte";
@@ -33,11 +34,11 @@
   }: { day: Moment; isUnderCursor?: boolean } = $props();
 
   const {
-    settings,
+    settingsStore,
     editContext: {
       confirmEdit,
       handlers: { handleContainerMouseDown },
-      getDisplayedTasksForTimeline,
+      getDisplayedTimeBlocksForTimeline,
       editOperation,
     },
     pointerDateTime,
@@ -45,14 +46,16 @@
     useSelector,
     logEntryEditor,
     workspaceFacade,
-    openEditTimeEntryModal,
+    openLogEntryEditModal,
   } = getObsidianContext();
 
-  const displayedTasksForTimeline = $derived(getDisplayedTasksForTimeline(day));
+  const displayedTimeBlocksForTimeline = $derived(
+    getDisplayedTimeBlocksForTimeline(day),
+  );
   const dayKey = $derived(getDayKey(day));
 
   const logEntriesForDay = useSelector((state) =>
-    selectLogEntriesForDay(state, dayKey, currentTimeSignal.current),
+    selectLogTimeBlocksForDay(state, dayKey, currentTimeSignal.current),
   );
   const logEntriesById = useSelector(selectLogEntriesById);
 
@@ -70,21 +73,21 @@
     if (isCompleted) {
       createCompletedClockMenu({
         event,
-        task: timeBlockView,
+        timeBlock: timeBlockView,
         logEntry: logEntry,
         logEntryEditor,
         workspaceFacade,
-        openEditTimeEntryModal,
+        openLogEntryEditModal,
       });
     } else {
       createActiveClockMenu({
         event,
-        task: timeBlockView,
+        timeBlock: timeBlockView,
         logEntryEditor,
         workspaceFacade,
         // pass the raw entry so "Edit..." targets the real (unclamped) entry
-        openEditTimeEntryModal: (timeBlock) =>
-          openEditTimeEntryModal(timeBlock, logEntry),
+        openLogEntryEditModal: (timeBlock) =>
+          openLogEntryEditModal(timeBlock, logEntry),
       });
     }
   }
@@ -94,7 +97,7 @@
   function updatePointerDateTime(event: MouseEvent | TouchEvent) {
     isNotVoid(el);
 
-    const newOffsetY = snap(getPointerOffsetY(el, event), $settings);
+    const newOffsetY = snap(getPointerOffsetY(el, event), $settingsStore);
     const minutesSinceMidnight = offsetYToMinutes(
       newOffsetY,
       settingsSignal.current.zoomLevel,
@@ -137,8 +140,8 @@
 </script>
 
 <div class="timeline">
-  {#if $settings.timelineColumns.planner}
-    <Column visibleHours={getVisibleHours($settings)}>
+  {#if $settingsStore.timelineColumns.planner}
+    <Column visibleHours={getVisibleHours($settingsStore)}>
       {#if $isToday(day)}
         <Needle autoScrollBlocked={isUnderCursor} />
       {/if}
@@ -157,11 +160,11 @@
         onpointerup={confirmEdit}
         use:timelineGestures
       >
-        {#each $displayedTasksForTimeline.withTime as task (task.id)}
-          <PositionedTimeBlock {task}>
-            <UnscheduledTimeBlock {task}>
+        {#each $displayedTimeBlocksForTimeline.withTime as timeBlock (timeBlock.id)}
+          <PositionedTimeBlock {timeBlock}>
+            <UnscheduledTimeBlock {timeBlock}>
               {#snippet bottomDecoration()}
-                {getBlockProps(task, settingsSignal.current)}
+                {getBlockProps(timeBlock, settingsSignal.current)}
               {/snippet}
             </UnscheduledTimeBlock>
           </PositionedTimeBlock>
@@ -170,27 +173,31 @@
     </Column>
   {/if}
 
-  {#if $settings.timelineColumns.timeTracker}
-    <Column visibleHours={getVisibleHours($settings)}>
+  {#if $settingsStore.timelineColumns.timeTracker}
+    <Column visibleHours={getVisibleHours($settingsStore)}>
       {#if $isToday(day)}
-        <Needle autoScrollBlocked={isUnderCursor} />
+        <Needle autoScrollBlocked={isUnderCursor}>
+          {#snippet controls()}
+            <NeedleClockControl />
+          {/snippet}
+        </Needle>
       {/if}
 
       <div class="tasks absolute-stretch-x">
-        {#each logEntriesForDay.current as task (task.id)}
-          <PositionedTimeBlock {task}>
+        {#each logEntriesForDay.current as timeBlock (timeBlock.id)}
+          <PositionedTimeBlock {timeBlock}>
             <Selectable
-              onSecondarySelect={(event) => showLogBlockMenu(event, task)}
+              onSecondarySelect={(event) => showLogBlockMenu(event, timeBlock)}
             >
               {#snippet children({ use, onpointerup, state })}
                 <LocalTimeBlock
                   isActive={state === "secondary"}
                   {onpointerup}
-                  {task}
+                  {timeBlock}
                   {use}
                 >
                   {#snippet bottomDecoration()}
-                    {getBlockProps(task, settingsSignal.current)}
+                    {getBlockProps(timeBlock, settingsSignal.current)}
                   {/snippet}
                 </LocalTimeBlock>
               {/snippet}

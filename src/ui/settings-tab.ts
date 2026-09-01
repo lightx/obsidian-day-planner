@@ -2,7 +2,7 @@ import { produce } from "immer";
 import { PluginSettingTab, SettingGroup } from "obsidian";
 import { type Component, mount, unmount } from "svelte";
 import type { Writable } from "svelte/store";
-import { isOneOf } from "typed-assert";
+import { isNotVoid, isOneOf } from "typed-assert";
 
 import { icons } from "../constants";
 import type DayPlanner from "../main";
@@ -51,7 +51,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
       .addSetting((setting) =>
         setting.setName("Show release notes after update").addToggle((toggle) =>
           toggle
-            .setValue(this.plugin.settings().releaseNotes)
+            .setValue(this.plugin.getSettings().releaseNotes)
             .onChange((value: boolean) => {
               this.update({ releaseNotes: value });
             }),
@@ -63,7 +63,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setDesc("Display a notification when a new task is started")
           .addToggle((toggle) =>
             toggle
-              .setValue(this.plugin.settings().showTaskNotification)
+              .setValue(this.plugin.getSettings().showTaskNotification)
               .onChange((value: boolean) => {
                 this.update({ showTaskNotification: value });
               }),
@@ -77,7 +77,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           )
           .addToggle((component) => {
             component
-              .setValue(this.plugin.settings().centerNeedle)
+              .setValue(this.plugin.getSettings().centerNeedle)
               .onChange((value) => {
                 this.update({ centerNeedle: value });
               });
@@ -88,7 +88,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setName("Sort tasks in planner chronologically after edits")
           .addToggle((component) => {
             component
-              .setValue(this.plugin.settings().sortTasksInPlanAfterEdit)
+              .setValue(this.plugin.getSettings().sortTasksInPlanAfterEdit)
               .onChange((value) => {
                 this.update({ sortTasksInPlanAfterEdit: value });
               });
@@ -101,7 +101,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
             task: `Task (- [ ] New item)`,
           });
           return dropdown
-            .setValue(this.plugin.settings().eventFormatOnCreation)
+            .setValue(this.plugin.getSettings().eventFormatOnCreation)
             .onChange((value) => {
               isOneOf(value, eventFormats);
               this.update({ eventFormatOnCreation: value });
@@ -118,7 +118,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .addSlider((slider) =>
             slider
               .setLimits(1, 5, 1)
-              .setValue(Number(this.plugin.settings().zoomLevel) ?? 4)
+              .setValue(Number(this.plugin.getSettings().zoomLevel) ?? 4)
               .setDynamicTooltip()
               .onChange((value: number) => {
                 this.update({ zoomLevel: value });
@@ -126,7 +126,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           ),
       );
 
-    if (this.plugin.settings().eventFormatOnCreation === "task") {
+    if (this.plugin.getSettings().eventFormatOnCreation === "task") {
       generalGroup.addSetting((setting) =>
         setting
           .setName("Default task status on creation")
@@ -136,7 +136,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .addText((el) =>
             el
               .setPlaceholder("Empty")
-              .setValue(this.plugin.settings().taskStatusOnCreation)
+              .setValue(this.plugin.getSettings().taskStatusOnCreation)
               .onChange((value: string) => {
                 this.settingsStore.update((previous) => {
                   const newValue =
@@ -163,7 +163,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
             icons.forEach((icon) => dropdown.addOption(icon, icon));
             return dropdown
               .setValue(
-                this.plugin.settings().timelineIcon ??
+                this.plugin.getSettings().timelineIcon ??
                   "calendar-with-checkmark",
               )
               .onChange((value: string) => {
@@ -192,7 +192,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
                 "11": "11",
                 "12": "12",
               })
-              .setValue(String(this.plugin.settings().startHour))
+              .setValue(String(this.plugin.getSettings().startHour))
               .onChange((value: string) => {
                 const asNumber = Number(value);
 
@@ -209,7 +209,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               saturday: "Saturday",
               friday: "Friday",
             })
-            .setValue(String(this.plugin.settings().firstDayOfWeek))
+            .setValue(String(this.plugin.getSettings().firstDayOfWeek))
             .onChange((value: string) => {
               isOneOf(value, firstDaysOfWeek);
 
@@ -241,7 +241,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           }),
       );
 
-    this.plugin.settings().icals.forEach((ical, index) => {
+    this.plugin.getSettings().icals.forEach((ical, index) => {
       new SettingGroup(containerEl)
         .setHeading(`Calendar ${index + 1}`)
         .addSetting((setting) =>
@@ -249,7 +249,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
             el.setValue(ical.color).onChange((value: string) => {
               this.settingsStore.update(
                 produce((draft) => {
-                  draft.icals[index].color = value;
+                  const ical = draft.icals[index];
+
+                  isNotVoid(ical);
+
+                  ical.color = value;
                 }),
               );
             }),
@@ -265,7 +269,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
                 .onChange((value: string) => {
                   this.settingsStore.update(
                     produce((draft) => {
-                      draft.icals[index].name = value;
+                      const ical = draft.icals[index];
+
+                      isNotVoid(ical);
+
+                      ical.name = value;
                     }),
                   );
                 }),
@@ -283,7 +291,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
                 .onChange((value: string) => {
                   this.settingsStore.update(
                     produce((draft) => {
-                      draft.icals[index].email = value.trim();
+                      const ical = draft.icals[index];
+
+                      isNotVoid(ical);
+
+                      ical.email = value.trim();
                     }),
                   );
                 }),
@@ -302,7 +314,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
 
                 this.settingsStore.update(
                   produce((draft) => {
-                    draft.icals[index].url = withCorrectProtocol;
+                    const ical = draft.icals[index];
+
+                    isNotVoid(ical);
+
+                    ical.url = withCorrectProtocol;
                   }),
                 );
               }),
@@ -338,7 +354,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               );
               component.addMomentFormat((momentFormat) =>
                 momentFormat
-                  .setValue(this.plugin.settings().hourFormat)
+                  .setValue(this.plugin.getSettings().hourFormat)
                   .setSampleEl(fragment.createSpan())
                   .onChange((value: string) => {
                     this.update({ hourFormat: value.trim() });
@@ -370,7 +386,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               );
               component.addMomentFormat((momentFormat) =>
                 momentFormat
-                  .setValue(this.plugin.settings().timestampFormat)
+                  .setValue(this.plugin.getSettings().timestampFormat)
                   .setSampleEl(fragment.createSpan())
                   .onChange((value: string) => {
                     this.update({ timestampFormat: value.trim() });
@@ -400,7 +416,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               fragment.appendText("Your current syntax looks like this: ");
               component.addMomentFormat((momentFormat) =>
                 momentFormat
-                  .setValue(this.plugin.settings().timelineDateFormat)
+                  .setValue(this.plugin.getSettings().timelineDateFormat)
                   .setSampleEl(fragment.createSpan())
                   .onChange((value: string) => {
                     this.update({ timelineDateFormat: value });
@@ -446,7 +462,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           )
           .addText((component) =>
             component
-              .setValue(this.plugin.settings().plannerHeading)
+              .setValue(this.plugin.getSettings().plannerHeading)
               .onChange((value) => {
                 this.update({ plannerHeading: value });
               }),
@@ -462,7 +478,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
             component
               .setLimits(1, 6, 1)
               .setDynamicTooltip()
-              .setValue(this.plugin.settings().plannerHeadingLevel)
+              .setValue(this.plugin.getSettings().plannerHeadingLevel)
               .onChange((value) => {
                 this.update({ plannerHeadingLevel: value });
               }),
@@ -476,7 +492,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setName("Show active clock and 'Clock in' button")
           .addToggle((toggle) =>
             toggle
-              .setValue(this.plugin.settings().showActiveClockInStatusBar)
+              .setValue(this.plugin.getSettings().showActiveClockInStatusBar)
               .onChange((value: boolean) => {
                 this.update({ showActiveClockInStatusBar: value });
               }),
@@ -485,7 +501,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
       .addSetting((setting) =>
         setting.setName("Show active task").addToggle((toggle) =>
           toggle
-            .setValue(this.plugin.settings().showNow)
+            .setValue(this.plugin.getSettings().showNow)
             .onChange((value: boolean) => {
               this.update({ showNow: value });
             }),
@@ -494,7 +510,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
       .addSetting((setting) =>
         setting.setName("Show upcoming task").addToggle((toggle) =>
           toggle
-            .setValue(this.plugin.settings().showNext)
+            .setValue(this.plugin.getSettings().showNext)
             .onChange((value: boolean) => {
               this.update({ showNext: value });
             }),
@@ -509,7 +525,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               pie: "Pie",
               none: "None",
             })
-            .setValue(String(this.plugin.settings().progressIndicator))
+            .setValue(String(this.plugin.getSettings().progressIndicator))
             .onChange((value) => {
               this.update({
                 progressIndicator:
@@ -526,7 +542,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setName("Show a timestamp next to task text in timeline")
           .addToggle((component) => {
             component
-              .setValue(this.plugin.settings().showTimestampInTaskBlock)
+              .setValue(this.plugin.getSettings().showTimestampInTaskBlock)
               .onChange((value) => {
                 this.update({ showTimestampInTaskBlock: value });
               });
@@ -545,7 +561,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           )
           .addToggle((component) => {
             component
-              .setValue(this.plugin.settings().extendDurationUntilNext)
+              .setValue(this.plugin.getSettings().extendDurationUntilNext)
               .onChange((value) => {
                 this.update({ extendDurationUntilNext: value });
               });
@@ -560,7 +576,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .addSlider((slider) =>
             slider
               .setLimits(5, 20, 5)
-              .setValue(this.plugin.settings().snapStepMinutes)
+              .setValue(this.plugin.getSettings().snapStepMinutes)
               .setDynamicTooltip()
               .onChange((value: number) => {
                 this.update({ snapStepMinutes: value });
@@ -576,7 +592,9 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .addSlider((slider) =>
             slider
               .setLimits(20, 120, 10)
-              .setValue(Number(this.plugin.settings().defaultDurationMinutes))
+              .setValue(
+                Number(this.plugin.getSettings().defaultDurationMinutes),
+              )
               .setDynamicTooltip()
               .onChange((value: number) => {
                 this.update({ defaultDurationMinutes: value });
@@ -590,7 +608,9 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .addSlider((slider) =>
             slider
               .setLimits(5, 15, 5)
-              .setValue(Number(this.plugin.settings().minimalDurationMinutes))
+              .setValue(
+                Number(this.plugin.getSettings().minimalDurationMinutes),
+              )
               .setDynamicTooltip()
               .onChange((value: number) => {
                 this.update({ minimalDurationMinutes: value });
@@ -620,7 +640,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           }),
       );
 
-    this.plugin.settings().colorOverrides.forEach((colorOverride, index) => {
+    this.plugin.getSettings().colorOverrides.forEach((colorOverride, index) => {
       colorBlockingGroup.addSetting((setting) =>
         setting
           .setName(`Color ${index + 1}`)
@@ -633,7 +653,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
             el.setValue(colorOverride.color).onChange((value: string) => {
               this.settingsStore.update(
                 produce((draft) => {
-                  draft.colorOverrides[index].color = value;
+                  const colorOverride = draft.colorOverrides[index];
+
+                  isNotVoid(colorOverride);
+
+                  colorOverride.color = value;
                 }),
               );
             }),
@@ -644,7 +668,11 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
               .onChange((value: string) => {
                 this.settingsStore.update(
                   produce((draft) => {
-                    draft.colorOverrides[index].darkModeColor = value;
+                    const colorOverride = draft.colorOverrides[index];
+
+                    isNotVoid(colorOverride);
+
+                    colorOverride.darkModeColor = value;
                   }),
                 );
               }),
@@ -693,7 +721,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           )
           .addToggle((component) => {
             component
-              .setValue(this.plugin.settings().timelineColored)
+              .setValue(this.plugin.getSettings().timelineColored)
               .onChange((value) => {
                 this.update({ timelineColored: value });
               });
@@ -704,7 +732,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setName("Colorful Timeline - Start Color")
           .addColorPicker((component) => {
             component
-              .setValue(this.plugin.settings().timelineStartColor)
+              .setValue(this.plugin.getSettings().timelineStartColor)
               .onChange((value) => {
                 this.update({ timelineStartColor: value });
               });
@@ -715,7 +743,7 @@ export class DayPlannerSettingsTab extends PluginSettingTab {
           .setName("Colorful Timeline - End Color")
           .addColorPicker((component) => {
             component
-              .setValue(this.plugin.settings().timelineEndColor)
+              .setValue(this.plugin.getSettings().timelineEndColor)
               .onChange((value) => {
                 this.update({ timelineEndColor: value });
               });

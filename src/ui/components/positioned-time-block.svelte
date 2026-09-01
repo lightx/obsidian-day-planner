@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
-  import { settings } from "../../global-store/settings";
+  import { settingsStore } from "../../global-store/settings";
   import type {
     TimeBlock,
     WithPlacing,
@@ -10,26 +10,30 @@
   import type { ActionArray } from "../actions/use-actions";
   import {
     useColoredTimeline,
-    useStylesForRelationToNow,
+    useColorsForRelationToNow,
   } from "../hooks/use-color.svelte";
-  import { useTaskVisuals } from "../hooks/use-task-visuals";
+  import { useTimeBlockVisuals } from "../hooks/use-time-block-visuals";
 
   const {
     children,
-    task,
+    timeBlock,
   }: {
     children: Snippet;
-    task: WithPlacing<WithDuration<TimeBlock>>;
+    timeBlock: WithPlacing<WithDuration<TimeBlock>>;
     use?: ActionArray;
   } = $props();
 
   const { height, offset, width, left } = $derived(
-    useTaskVisuals(task, { settings }),
+    useTimeBlockVisuals(timeBlock, { settingsStore }),
   );
 
-  const relationToNow = $derived(useStylesForRelationToNow(task));
+  const relationToNow = $derived(useColorsForRelationToNow(timeBlock));
 
-  const coloredTimeline = $derived(useColoredTimeline(task));
+  const padding = $derived(
+    timeBlock.truncated?.includes("bottom") ? "0 1px 0" : undefined,
+  );
+
+  const coloredTimeline = $derived(useColoredTimeline(timeBlock));
   const { normal, muted, faint } = $derived(
     coloredTimeline.properContrastColors,
   );
@@ -42,6 +46,7 @@
   style:--text-normal={normal}
   style:--time-block-height={$height}
   style:--time-block-left={left}
+  style:--time-block-padding={padding}
   style:--time-block-position="absolute"
   style:--time-block-top={$offset}
   style:--time-block-width={width}

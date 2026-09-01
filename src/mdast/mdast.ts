@@ -12,6 +12,7 @@ import { compareTimestamps } from "../parser/parser";
 import {
   dashOrNumberWithMultipleSpaces,
   escapedSquareBracket,
+  escapedUnderscore,
   listItemRegExp,
 } from "../regexp";
 
@@ -89,6 +90,7 @@ export function findHeadingWithChildren(
 
   const planHeading = root.children[planHeadingIndex];
 
+  isNotVoid(planHeading);
   isHeading(planHeading);
 
   const nodesAfterHeading = root.children.slice(planHeadingIndex + 1);
@@ -345,5 +347,6 @@ export function toMdastPoint(editorPosition: EditorPosition) {
 function postProcess(input: string) {
   return input
     .replace(dashOrNumberWithMultipleSpaces, "$1 ")
-    .replace(escapedSquareBracket, "[");
+    .replace(escapedSquareBracket, "[")
+    .replace(escapedUnderscore, "_");
 }

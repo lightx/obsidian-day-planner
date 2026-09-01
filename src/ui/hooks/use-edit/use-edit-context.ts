@@ -54,9 +54,9 @@ export function useEditContext(props: {
   workspaceFacade: WorkspaceFacade;
   periodicNotes: PeriodicNotes;
   onUpdate: OnUpdateFn;
-  settings: Readable<DayPlannerSettings>;
-  localTasks: Readable<EditableTimeBlock[]>;
-  remoteTasks: Readable<RemoteTimeBlock[]>;
+  settingsStore: Readable<DayPlannerSettings>;
+  localTimeBlocks: Readable<EditableTimeBlock[]>;
+  remoteTimeBlocks: Readable<RemoteTimeBlock[]>;
   pointerDateTime: Readable<PointerDateTime>;
   abortEditTrigger: Readable<unknown>;
   onEditAborted: OnEditAbortedFn;
@@ -66,9 +66,9 @@ export function useEditContext(props: {
     periodicNotes,
     onEditAborted,
     onUpdate,
-    settings,
-    localTasks: localTimeBlocks,
-    remoteTasks: remoteTimeBlocks,
+    settingsStore,
+    localTimeBlocks,
+    remoteTimeBlocks,
     pointerDateTime,
     abortEditTrigger,
   } = props;
@@ -92,9 +92,9 @@ export function useEditContext(props: {
   const cursor = useCursor(editOperation);
 
   const localFilteredTimeBlocks = derived(
-    [localTimeBlocks, settings],
-    ([$localTimeBlocks, $settings]) =>
-      $settings.showCompletedTasks
+    [localTimeBlocks, settingsStore],
+    ([$localTimeBlocks, $settingsStore]) =>
+      $settingsStore.showCompletedTasks
         ? $localTimeBlocks
         : $localTimeBlocks.filter(
             (it) => !it.task || it.task.toLowerCase() !== "x",
@@ -106,13 +106,18 @@ export function useEditContext(props: {
   });
 
   const timeBlocksWithPendingUpdate = derived(
-    [editOperation, baselineTimeBlocks, settings, pointerDateTime],
-    ([$editOperation, $baselineTimeBlocks, $settings, $pointerDateTime]) => {
+    [editOperation, baselineTimeBlocks, settingsStore, pointerDateTime],
+    ([
+      $editOperation,
+      $baselineTimeBlocks,
+      $settingsStore,
+      $pointerDateTime,
+    ]) => {
       return $editOperation
         ? transform(
             $baselineTimeBlocks,
             $editOperation,
-            $settings,
+            $settingsStore,
             $pointerDateTime,
           )
         : $baselineTimeBlocks;
@@ -121,8 +126,8 @@ export function useEditContext(props: {
 
   const { startEdit, confirmEdit, cancelEdit } = useEditActions({
     editOperation,
-    baselineTasks: baselineTimeBlocks,
-    tasksWithPendingUpdate: timeBlocksWithPendingUpdate,
+    baselineTimeBlocks,
+    timeBlocksWithPendingUpdate,
     onUpdate,
   });
 
@@ -132,7 +137,7 @@ export function useEditContext(props: {
     workspaceFacade,
     startEdit,
     editOperation,
-    settings,
+    settingsStore,
   });
 
   const combinedTimeBlocks = derived(
@@ -210,7 +215,7 @@ export function useEditContext(props: {
           .map(
             (timeBlock): TimelineTimeBlock =>
               t.isWithDuration(timeBlock)
-                ? t.truncateToRange(timeBlock, range)
+                ? t.truncateToDayRange(timeBlock, range)
                 : timeBlock,
           );
       },
@@ -240,12 +245,12 @@ export function useEditContext(props: {
   return {
     handlers,
     cursor,
-    dayToDisplayedTasks: dayToDisplayedTimeBlocks,
+    dayToDisplayedTimeBlocks,
     confirmEdit,
     cancelEdit,
     editOperation,
-    getDisplayedTasksForTimeline: getDisplayedTimeBlocksForTimeline,
-    getDisplayedAllDayTasksForMultiDayRow:
+    getDisplayedTimeBlocksForTimeline,
+    getDisplayedAllDayTimeBlocksForMultiDayRow:
       getDisplayedAllDayTimeBlocksForMultiDayRow,
   };
 }

@@ -22,12 +22,12 @@
   }
 
   const {
-    task,
     timeBlock,
+    content,
   }: {
-    task: EditableTimeBlock;
+    timeBlock: EditableTimeBlock;
     class?: string;
-    timeBlock: Snippet<[TimeBlockProps]>;
+    content: Snippet<[TimeBlockProps]>;
   } = $props();
 
   const {
@@ -35,47 +35,48 @@
     workspaceFacade,
     editText,
     editLine,
-    deleteTask,
+    deleteTimeBlock,
+    logEntryEditor,
   } = getObsidianContext();
 
-  async function editTaskSummary() {
-    if (task.source === "unwritten") {
+  async function editTimeBlockSummary() {
+    if (timeBlock.source === "unwritten") {
       throw new Error("Cannot edit the summary of an unwritten time block");
     }
 
-    if (task.isBoldTimeEntry) {
+    if (timeBlock.isBoldTimeEntry) {
       // Bold-time format: **HH:MM** text
-      // task.text contains only the text after **HH:MM**
+      // timeBlock.text contains only the text after **HH:MM**
       const next = await editText({
-        initialText: task.text,
+        initialText: timeBlock.text,
         getDescriptionText: (value) =>
           value.trim().length === 0
             ? "Start typing to update task text"
             : `Update to "${value}"`,
       });
 
-      if (next === undefined || next === task.text) {
+      if (next === undefined || next === timeBlock.text) {
         return;
       }
 
-      // Reconstruct the time prefix from task data
+      // Reconstruct the time prefix from time block data
       const timestamp = createTimestamp(
-        getMinutesSinceMidnight(task.startTime),
-        task.durationMinutes,
+        getMinutesSinceMidnight(timeBlock.startTime),
+        timeBlock.durationMinutes,
         "HH:mm",
       );
       const lineContents = `**${timestamp}** ${next}`;
 
       await editLine({
-        path: task.location.path,
-        position: task.location.position.start,
+        path: timeBlock.path,
+        position: timeBlock.position.start,
         contents: lineContents,
       });
       return;
     }
 
-    // List-item format: - HH:MM - text
-    const firstLine = getFirstLine(task.text);
+    // todo: replace with getOnelineSummary()
+    const firstLine = getFirstLine(timeBlock.text);
     const timestampMatch = firstLine.match(timeRangeAtStartOfLineRegExp);
     const timestampEnd = timestampMatch ? timestampMatch[0].length : 0;
     const afterTimestamp = firstLine.slice(timestampEnd);
@@ -97,9 +98,9 @@
     const lineStart = firstLine.slice(0, timestampEnd) + leadingSpace;
 
     await editLine({
-      path: task.path,
-      position: task.position.start,
-      contents: `${createMarkdownListTokens(task)} ${lineStart}${next}`,
+      path: timeBlock.path,
+      position: timeBlock.position.start,
+      contents: `${createMarkdownListTokens(timeBlock)} ${lineStart}${next}`,
     });
   }
 </script>
@@ -108,17 +109,18 @@
   onSecondarySelect={(event) =>
     createTimeBlockMenu({
       event,
-      task,
+      timeBlock,
+      logEntryEditor,
       workspaceFacade,
-      onEdit: editTaskSummary,
-      onDelete: deleteTask,
+      onEdit: editTimeBlockSummary,
+      onDelete: deleteTimeBlock,
     })}
   selectionBlocked={Boolean($editOperation)}
 >
   {#snippet children(selectable)}
     <FloatingControls active={selectable.state === "primary"}>
       {#snippet anchor(floatingControls)}
-        {@render timeBlock({
+        {@render content({
           isActive: selectable.state !== "none",
           onPointerUp: selectable.onpointerup,
           use: [...selectable.use, ...floatingControls.actions],
@@ -130,19 +132,25 @@
           --expanding-controls-position="absolute"
           {isActive}
           {setIsActive}
-          {task}
+          {timeBlock}
         />
       {/snippet}
 
       {#snippet bottom({ isActive, setIsActive })}
-        {#if !task.isAllDayEvent}
-          <ResizeControls {isActive} reverse {setIsActive} {task} />
+        {#if !timeBlock.isAllDayEvent}
+          <ResizeControls {isActive} reverse {setIsActive} {timeBlock} />
         {/if}
       {/snippet}
 
       {#snippet top({ isActive, setIsActive })}
-        {#if !task.isAllDayEvent}
-          <ResizeControls fromTop {isActive} reverse {setIsActive} {task} />
+        {#if !timeBlock.isAllDayEvent}
+          <ResizeControls
+            fromTop
+            {isActive}
+            reverse
+            {setIsActive}
+            {timeBlock}
+          />
         {/if}
       {/snippet}
     </FloatingControls>

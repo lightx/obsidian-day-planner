@@ -14,9 +14,9 @@ import type { OnEditAbortedFn, OnUpdateFn, PointerDateTime } from "../../types";
 import { getUpdateTrigger } from "../../util/store";
 
 import { useEditContext } from "./use-edit/use-edit-context";
-import { useNewlyStartedTasks } from "./use-newly-started-tasks";
+import { useNewlyStartedTimeBlocks } from "./use-newly-started-time-blocks";
 
-export function useTasks(props: {
+export function useTimeBlocks(props: {
   settingsStore: Writable<DayPlannerSettings>;
   isOnline: Readable<boolean>;
   currentTime: Readable<Moment>;
@@ -24,9 +24,9 @@ export function useTasks(props: {
   onUpdate: OnUpdateFn;
   onEditAborted: OnEditAbortedFn;
   pointerDateTime: Readable<PointerDateTime>;
-  remoteTasks: Readable<RemoteTimeBlock[]>;
+  remoteTimeBlocks: Readable<RemoteTimeBlock[]>;
   periodicNotes: PeriodicNotes;
-  localTasks: Readable<EditableTimeBlock[]>;
+  localTimeBlocks: Readable<EditableTimeBlock[]>;
 }) {
   const {
     settingsStore,
@@ -36,11 +36,11 @@ export function useTasks(props: {
     pointerDateTime,
     onUpdate,
     onEditAborted,
-    remoteTasks: remoteTimeBlocks,
-    localTasks: localTimeBlocks,
+    remoteTimeBlocks,
+    localTimeBlocks,
   } = props;
 
-  const tasksWithTimeForToday = derived(
+  const timeBlocksWithTimeForToday = derived(
     [localTimeBlocks, remoteTimeBlocks, currentTime],
     ([$localTimeBlocks, $remoteTimeBlocks, $currentTime]: [
       TimeBlock[],
@@ -64,22 +64,22 @@ export function useTasks(props: {
     workspaceFacade,
     onUpdate,
     onEditAborted,
-    settings: settingsStore,
-    localTasks: localTimeBlocks,
-    remoteTasks: remoteTimeBlocks,
+    settingsStore,
+    localTimeBlocks,
+    remoteTimeBlocks,
     pointerDateTime,
     abortEditTrigger,
   });
 
-  const newlyStartedTasks = useNewlyStartedTasks({
-    settings: settingsStore,
-    tasksWithTimeForToday,
+  const newlyStartedTimeBlocks = useNewlyStartedTimeBlocks({
+    settingsStore,
+    timeBlocksWithTimeForToday,
     currentTime,
   });
 
   return {
-    tasksWithTimeForToday,
+    timeBlocksWithTimeForToday,
     editContext,
-    newlyStartedTasks,
+    newlyStartedTimeBlocks,
   };
 }

@@ -1,11 +1,10 @@
 <script lang="ts">
   import { fromStore } from "svelte/store";
-  import { isNotVoid } from "typed-assert";
 
   import { getDateRangeContext } from "../../context/date-range-context";
   import { getObsidianContext } from "../../context/obsidian-context";
   import { getVisibleHours } from "../../global-store/derived-settings";
-  import { settings } from "../../global-store/settings";
+  import { settingsStore } from "../../global-store/settings";
   import type { TimelineTimeBlock } from "../../time-block-types";
 
   import BlockList from "./block-list.svelte";
@@ -18,29 +17,26 @@
 
   const { editContext, pointerDateTime } = getObsidianContext();
 
-  const getDisplayedAllDayTasksForMultiDayRow = fromStore(
-    editContext.getDisplayedAllDayTasksForMultiDayRow,
+  const getDisplayedAllDayTimeBlocksForMultiDayRow = fromStore(
+    editContext.getDisplayedAllDayTimeBlocksForMultiDayRow,
   );
 
-  const dateRange = fromStore(getDateRangeContext());
-  const firstDayInRange = $derived(dateRange.current[0]);
+  const dateRange = getDateRangeContext();
+  const firstDayInRange = $derived(dateRange.first);
+  const lastDayInRange = $derived(dateRange.last);
 
-  const displayedAllDayTasks = $derived(
-    getDisplayedAllDayTasksForMultiDayRow.current({
+  const displayedAllDayTimeBlocks = $derived(
+    getDisplayedAllDayTimeBlocksForMultiDayRow.current({
       start: firstDayInRange,
-      end: dateRange.current[dateRange.current.length - 1],
+      end: lastDayInRange,
     }),
   );
 
   let rulerRef: HTMLDivElement | undefined = $state();
 
   function handleAllDayEventsPointerMove() {
-    const currentDate = dateRange.current[0];
-
-    isNotVoid(currentDate);
-
     pointerDateTime.set({
-      dateTime: currentDate,
+      dateTime: dateRange.first,
       type: "date",
     });
   }
@@ -60,7 +56,7 @@
   <div class="corner"></div>
 
   <div bind:this={rulerRef} class="ruler">
-    <Ruler visibleHours={getVisibleHours($settings)} />
+    <Ruler visibleHours={getVisibleHours($settingsStore)} />
     <div class="scrollbar-filler"></div>
   </div>
 
@@ -77,10 +73,10 @@
     <BlockList
       --block-list-padding="var(--size-2-1) 3px 0"
       className="all-day-events"
-      list={displayedAllDayTasks}
+      list={displayedAllDayTimeBlocks}
     >
-      {#snippet match(task: TimelineTimeBlock)}
-        <UnscheduledTimeBlock {task} />
+      {#snippet match(timeBlock: TimelineTimeBlock)}
+        <UnscheduledTimeBlock {timeBlock} />
       {/snippet}
       {#snippet fallback()}
         <div class="empty-all-day-events">No all day events</div>
@@ -99,11 +95,6 @@
 </ErrorBoundary>
 
 <style>
-  :global(svg.svg-icon.planner-settings-icon) {
-    width: var(--icon-s);
-    height: var(--icon-s);
-  }
-
   .corner {
     grid-area: corner;
     background-color: var(--background-primary);
@@ -144,7 +135,7 @@
     overflow: auto;
   }
 
-  :global(.unscheduled-task-container) {
+  :global(.unscheduled-time-block-container) {
     overflow: auto;
   }
 

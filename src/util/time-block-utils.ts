@@ -3,7 +3,7 @@ import type { Moment } from "moment";
 import { get } from "svelte/store";
 
 import { bullet, defaultDayFormat, emDash } from "../constants";
-import { settings } from "../global-store/settings";
+import { settingsStore } from "../global-store/settings";
 import { replaceOrPrependTimeRange } from "../parser/parser";
 import {
   obsidianBlockIdRegExp,
@@ -138,11 +138,16 @@ export function copy(
     throw new Error("Cannot copy unwritten time blocks");
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { path, position, ...withoutFileLocation } = original;
-
   return {
-    ...withoutFileLocation,
+    text: original.text,
+    status: original.status,
+    symbol: original.symbol,
+    task: original.task,
+    startTime: original.startTime,
+    durationMinutes: original.durationMinutes,
+    isAllDayEvent: original.isAllDayEvent,
+    truncated: original.truncated,
+    children: original.children,
     source: "unwritten",
     destination: getCopyDestination(original),
     id: getId(),
@@ -185,7 +190,7 @@ export function toString(timeBlock: WithDuration<EditableTimeBlock>) {
   const updatedTimestamp = createTimestamp(
     getMinutesSinceMidnight(timeBlock.startTime),
     timeBlock.durationMinutes,
-    get(settings).timestampFormat,
+    get(settingsStore).timestampFormat,
   );
 
   if (timeBlock.isBoldTimeEntry) {
@@ -276,7 +281,13 @@ export function getOneLineSummary(timeBlock: TimeBlock) {
   return pipe(timeBlock.text, getFirstLine, removeTimeRangeFromStartOfLine);
 }
 
-export function truncateToRange<T extends WithDuration<TimeBlock>>(
+/**
+ * Clips a block to the whole days covered by `range` and records which
+ * horizontal edges got cut, so the multi-day view can render the block as
+ * continuing outside the range. For plain time clamping without the render
+ * flags use {@link clampToTimeRange}.
+ */
+export function truncateToDayRange<T extends WithDuration<TimeBlock>>(
   timeBlock: T,
   range: m.Range,
 ): T {
@@ -326,11 +337,17 @@ export function isTimeEqual(a: EditableTimeBlock, b: EditableTimeBlock) {
   );
 }
 
-export function clamp<T extends WithDuration<TimeBlock>>(
+/**
+ * Pulls a block's start and end inside `range` at exact time precision. Unlike
+ * {@link truncateToDayRange} it does not snap to day boundaries and does not
+ * mark the block as truncated.
+ */
+export function clampToTimeRange<T extends WithDuration<TimeBlock>>(
   timeBlock: T,
-  start: Moment,
-  end: Moment,
+  range: m.Range,
 ): T {
+  const { start, end } = range;
+
   const clampedStartTime = timeBlock.startTime.isBefore(start)
     ? start
     : timeBlock.startTime;

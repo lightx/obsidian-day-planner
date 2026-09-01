@@ -4,7 +4,7 @@
   import { debounce } from "obsidian";
 
   import { getObsidianContext } from "../../context/obsidian-context";
-  import { selectRecentLogEntries } from "../../redux/index/index-selectors";
+  import { selectRecentLogTimeBlocks } from "../../redux/index/index-selectors";
   import type { LogTimeBlock } from "../../time-block-types";
   import { runWithNoticeOnError } from "../../util/effect";
   import { filterByKeywords } from "../../util/keyword-filter";
@@ -24,7 +24,7 @@
     getObsidianContext();
 
   const recentLogRecords = useSelector((state) =>
-    selectRecentLogEntries(state),
+    selectRecentLogTimeBlocks(state),
   );
 
   let fieldState = $state("");
@@ -50,7 +50,7 @@
   );
 
   const grouped = $derived(
-    Array.groupBy(filtered, (task) => getDayKey(task.startTime)),
+    Array.groupBy(filtered, (timeBlock) => getDayKey(timeBlock.startTime)),
   );
 </script>
 
@@ -72,12 +72,12 @@
       {window.moment(title).format(settingsSignal.current.timelineDateFormat)}
     </div>
   {/snippet}
-  {#snippet match(task: LogTimeBlock)}
+  {#snippet match(timeBlock: LogTimeBlock)}
     <Selectable
       onSecondarySelect={(event) => {
         createRecentClockMenu({
           event,
-          task,
+          timeBlock,
           logEntryEditor,
           workspaceFacade,
         });
@@ -87,7 +87,7 @@
         <LocalTimeBlockComponent
           isActive={state === "secondary"}
           {onpointerup}
-          {task}
+          {timeBlock}
           {use}
         >
           {#snippet blockEndDecoration()}
@@ -95,7 +95,7 @@
               <ControlButton
                 label="Start tracking time on this task"
                 onclick={async () => {
-                  await runWithNoticeOnError(logEntryEditor.clockIn(task));
+                  await runWithNoticeOnError(logEntryEditor.clockIn(timeBlock));
                 }}
               >
                 {#snippet icon()}
@@ -109,9 +109,9 @@
               <Pill
                 key={File}
                 onclick={async () => {
-                  await workspaceFacade.revealLocation(task);
+                  await workspaceFacade.revealLocation(timeBlock);
                 }}
-                value={removeMarkdownExtension(task.path)}
+                value={removeMarkdownExtension(timeBlock.path)}
               />
             </Properties>
           {/snippet}
